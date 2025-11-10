@@ -6,124 +6,123 @@ import { ConferenceSchedule } from "@/components/conference/ConferenceSchedule";
 import { useParams } from "react-router-dom";
 import { ConferenceStatisticCard } from "@/components/conference/ConferenceStatisticCard";
 import ConferenceTopBar from "@/components/conference/ConferenceTopBar";
-
-
+import { useEffect, useState } from "react";
+import { useApi } from "@/hooks/use-api";
 
 const ConferenceDetail = () => {
-  const conference = {
-    title: "Hội nghị Công nghệ Số Việt Nam 2025",
-    startDate: "09:00, ngày 03/11/2025",
-    endDate: "17:00, ngày 05/11/2025",
-    location: "Trung tâm hội nghị Quốc Gia, TP. Hà Nội",
-    // ISO timestamps for countdown logic
-    startAt: "2025-11-03T09:00:00+07:00",
-    endAt: "2025-11-05T17:00:00+07:00",
-    image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=80",
-    stats: {
-      checkedIn: 100,
-      registered: 1000,
-      participation: "1%",
-    },
-  };
+  const { id } = useParams<{ id: string }>();
+  const { api, safeRequest } = useApi();
 
-  const schedule = [
-    {
-      time: "09:00 - 10:00",
-      title: "Xu hướng AI trong 5 năm tới",
-      description:
-        "Tập trung vào việc ứng dụng AI trong các lĩnh vực quản lý, y tế, và sản xuất.",
-      room: "Phòng A1",
-      speakers: ["Nguyễn Văn A", "Trần Thị B"],
-    },
-    {
-      time: "10:00 - 12:00",
-      title: "Điện toán đám mây & Hạ tầng số bền vững",
-      description:
-        "Giải pháp tối ưu hạ tầng đám mây, tiết kiệm chi phí và bảo mật.",
-      room: "Phòng A2",
-      speakers: ["Lê Văn C"],
-    },
-  ];
+  const [loading, setLoading] = useState(true);
+  const [event, setEvent] = useState<any | null>(null);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [statistics, setStatistics] = useState<{ registered: number; checkedIn: number; hourly?: { hour: string; count: number }[] }>({ registered: 0, checkedIn: 0, hourly: [] });
 
-  const genderStats = [
-    { label: "Nam", percentage: 70 },
-    { label: "Nữ", percentage: 30 },
-  ];
+  useEffect(() => {
+    const load = async () => {
+      if (!id) return;
+      setLoading(true);
 
-  const ageGroups = [
-    { range: "18-25", value: 40 },
-    { range: "26-35", value: 60 },
-    { range: "36-45", value: 55 },
-    { range: "46-60", value: 35 },
-  ];
+      // load event detail
+      const evRes = await safeRequest(() => api.get(`/organizer/events/${id}`));
+      const evData = (evRes as any)?.data ?? evRes ?? null;
+      if (evData) setEvent(evData);
 
-  const { id } = useParams();
+      // load sessions (backend should expose: GET /organizer/events/:id/sessions)
+      const sRes = await safeRequest(() => api.get(`/organizer/events/${id}/sessions`));
+      const sData = (sRes as any)?.data ?? sRes ?? [];
+      setSessions(Array.isArray(sData) ? sData : []);
+
+      // load statistics (backend should expose: GET /organizer/events/:id/statistics)
+      const stRes = await safeRequest(() => api.get(`/organizer/events/${id}/statistics`));
+      const stData = (stRes as any)?.data ?? stRes ?? null;
+      if (stData) {
+        setStatistics({
+          registered: stData.registered ?? stData.totalRegistrations ?? 0,
+          checkedIn: stData.checkedIn ?? stData.totalCheckedIn ?? 0,
+          hourly: stData.hourly ?? stData.hourly_checkins ?? [],
+        });
+      }
+
+      setLoading(false);
+    };
+
+    load();
+  }, [id, api, safeRequest]);
+
+  if (loading) {
+    return (
+      <ConferenceLayout>
+        <div className="px-6 py-6">
+          <div className="flex items-center justify-center h-[calc(100vh-6rem)]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Đang tải...</p>
+            </div>
+          </div>
+        </div>
+      </ConferenceLayout>
+    );
+  }
+
+  const participation = statistics.registered > 0 ? `${Math.round((statistics.checkedIn / statistics.registered) * 100)}%` : "0%";
+
+  const schedule = sessions.length
+    ? sessions.map((s: any) => ({
+        time: s.start && s.end ? `${new Date(s.start).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} - ${new Date(s.end).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}` : s.time ?? "",
+        title: s.title ?? s.name ?? "Phiên",
+        description: s.description,
+        room: s.room ?? s.location ?? "",
+        speakers: s.speakers ? s.speakers.map((sp: any) => sp.full_name ?? sp.name) : s.speaker ? [s.speaker] : [],
+      }))
+    : [];
+
+  const hourlyData = statistics.hourly && statistics.hourly.length > 0 ? statistics.hourly.map((h) => ({ hour: h.hour, count: h.count })) : [];
 
   return (
     <ConferenceLayout>
       <div className="px-6 py-6">
-        <ConferenceTopBar title={conference.title}/>
-          <div id="dashboard" className="space-y-8">
-          {/* Top grid: Left quick info + stats, Right thumbnail */}
+        <ConferenceTopBar title={event?.name || "Hội nghị"} />
+        <div id="dashboard" className="space-y-8">
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-14 items-stretch">
             <div className="xl:col-span-7 space-y-3">
-              <ConferenceHeader conference={conference} />
-              <ConferenceStats stats={conference.stats} />
+              <ConferenceHeader
+                conference={{
+                  startDate: event?.start_time ? new Date(event.start_time).toLocaleString("vi-VN") : "",
+                  endDate: event?.end_time ? new Date(event.end_time).toLocaleString("vi-VN") : "",
+                  location: event?.location || "",
+                  startAt: event?.start_time,
+                  endAt: event?.end_time,
+                }}
+              />
+              <ConferenceStats
+                stats={{
+                  registered: statistics.registered,
+                  checkedIn: statistics.checkedIn,
+                  participation,
+                }}
+              />
             </div>
+
             <div className="xl:col-span-5">
-              <ConferenceThumbnail image={conference.image} />
+              <ConferenceThumbnail image={event?.thumbnail || event?.image || "/placeholder.svg"} />
             </div>
           </div>
 
-          {/* Schedule + Charts */}
           <div id="schedule" className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <ConferenceSchedule
-              schedule={[
-                {
-                  time: "09:00 - 10:00",
-                  title: "Xu hướng AI trong 5 năm tới",
-                  speaker: "Nguyễn Văn A",
-                  room: "Phòng A1",
-                },
-                {
-                  time: "10:00 - 12:00",
-                  title: "Điện toán đám mây và hạ tầng bền vững",
-                  speaker: "Trần Thị B",
-                  room: "Phòng A2",
-                },
-                {
-                  time: "13:30 - 14:30",
-                  title: "Bảo mật hệ thống trong kỷ nguyên AI",
-                  speaker: "Lê Văn C",
-                  room: "Phòng B1",
-                },
-              ]}
-            />
-            <ConferenceStatisticCard
-              type="pie"
-              title="Thống kê giới tính tham dự"
-              data={genderStats.map((g) => ({ name: g.label, value: g.percentage }))}
-              nameField="name"
-              valueField="value"
-              height={280}
-            />
-          </div>
+            {schedule.length === 0 ? (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <h3 className="text-lg font-semibold mb-2">Lịch trình hội nghị</h3>
+                <p className="text-sm text-muted-foreground">Không có phiên hội nghị</p>
+              </div>
+            ) : (
+              <ConferenceSchedule schedule={schedule} />
+            )}
 
-          {/* Peak hours bar chart */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <ConferenceStatisticCard 
+            <ConferenceStatisticCard
               type="bar"
-              title="Thống kê giờ cao điểm"
-              data={[
-                { hour: "08:00", count: 30 },
-                { hour: "09:00", count: 50 },
-                { hour: "10:00", count: 85 },
-                { hour: "11:00", count: 55 },
-                { hour: "12:00", count: 75 },
-                { hour: "13:00", count: 110 },
-                { hour: "14:00", count: 10 },
-                { hour: "15:00", count: 30 },
-              ]}
+              title="Thống kê giờ check-in"
+              data={hourlyData}
               xField="hour"
               yField="count"
               height={400}
@@ -131,7 +130,6 @@ const ConferenceDetail = () => {
             />
           </div>
 
-          {/* Anchor placeholders for future sections */}
           <div id="registrations" />
           <div id="edit" />
         </div>

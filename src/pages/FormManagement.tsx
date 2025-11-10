@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useApi } from "@/hooks/use-api";
 import { ConferenceLayout } from "@/components/layout/ConferenceLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ type FormManagementProps = {};
 const FormManagement = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { api, safeRequest } = useApi()
 
   // Form state
   const [thumbnail, setThumbnail] = useState<File | null>(null);
@@ -64,6 +66,9 @@ const FormManagement = () => {
   });
 
   // Mock form info (replace with API)
+  const [formId, setFormId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
   const formInfo = {
     displayStatus: isPublished ? "Đã xuất bản" : "Chưa xuất bản",
     maxRegistrations: "100,000",
@@ -190,9 +195,98 @@ const FormManagement = () => {
 
   const handlePublish = () => {
     setIsPublished(true);
-    // TODO: Save form and publish via API
-    console.log("Publishing form...", { fields, thumbnail });
+    // Save form and publish via API
+    saveForm(true)
   };
+
+  const mapFieldToPayload = (f: FormField, position: number) => {
+    const FIELD_TYPE_MAP: Record<string, string> = {
+      text: 'TEXT',
+      textarea: 'TEXTAREA',
+      multipleChoice: 'RADIO',
+      email: 'EMAIL',
+      number: 'NUMBER',
+      date: 'DATE'
+    }
+
+    return {
+      field_label: f.label,
+      field_description: '',
+      field_type: FIELD_TYPE_MAP[f.type] || 'TEXT',
+      field_options: f.options || [],
+      field_has_other_option: false,
+      field_range: { min: null, max: null },
+      field_extensions: [],
+      required: !!f.required,
+      is_primary_key: !!f.isDefault,
+      can_edit: true,
+      position
+    }
+  }
+
+  const saveForm = async (publish = false) => {
+    if (!id) return
+    const payload = {
+      event_id: id,
+      title: `Form đăng ký ${id}`,
+      description: '',
+      is_public: publish || isPublished,
+      fields: fields.map((f, idx) => mapFieldToPayload(f, idx))
+    }
+
+    setLoading(true)
+    await safeRequest(async () => {
+      if (formId) {
+        // update
+        await api.put(`/organizer/events/forms/${formId}`, {
+          title: payload.title,
+          description: payload.description,
+          is_public: payload.is_public
+        })
+        // update fields: for simplicity, delete existing fields and recreate via createFormWithFields is not available;
+        // here we'll call create endpoint only when creating a new form. If updating fields is needed, call field endpoints.
+      } else {
+        const created = await api.post('/organizer/events/forms', payload)
+        if (created?.form && created.form._id) {
+          setFormId(created.form._id)
+        }
+      }
+    })
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    // Load existing form by event id
+    if (!id) return
+    safeRequest(async () => {
+      const form = await api.get(`/organizer/events/forms/event/${id}`)
+      if (form) {
+        setFormId(form._id)
+        setIsPublished(!!form.is_public)
+        // map fields from backend to local representation
+        const mapped = (form.fields || []).map((f: any, idx: number) => {
+          const TYPE_MAP: Record<string, any> = {
+            TEXT: 'text',
+            TEXTAREA: 'textarea',
+            RADIO: 'multipleChoice',
+            CHECKBOX: 'multipleChoice',
+            EMAIL: 'email',
+            NUMBER: 'number',
+            DATE: 'date'
+          }
+          return {
+            id: f._id || String(idx),
+            label: f.field_label,
+            type: TYPE_MAP[f.field_type] || 'text',
+            required: !!f.required,
+            options: f.field_options || [],
+            isDefault: !!f.is_primary_key
+          }
+        })
+        if (mapped.length > 0) setFields(mapped)
+      }
+    })
+  }, [id])
 
   const handleBack = () => {
     navigate(`/conference/${id}/registrations`);

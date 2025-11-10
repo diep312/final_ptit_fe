@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, X } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
 
 type CalendarItem = {
   id: string;
@@ -66,9 +67,10 @@ const SessionSchedule = () => {
   const today = new Date();
   const weekStart = startOfWeek(today);
 
-  // Demo rooms and items (replace with API in real app)
-  const [rooms, setRooms] = useState<string[]>(["Phòng A1", "Phòng A2", "Phòng B1"]);
-  const [selectedRoom, setSelectedRoom] = useState<string>(rooms[0]);
+  // rooms / places loaded from API
+  const { api, safeRequest } = useApi();
+  const [places, setPlaces] = useState<{ id: string; name: string }[]>([]);
+  const [selectedRoom, setSelectedRoom] = useState<string | undefined>(undefined);
   const [newRoom, setNewRoom] = useState("");
 
   // Dialog state
@@ -91,41 +93,19 @@ const SessionSchedule = () => {
     { id: "3", name: "Lê Văn C", avatarUrl: "" },
   ];
 
+  const [event, setEvent] = useState<any | null>(null);
+  const [isEditable, setIsEditable] = useState(true);
+
   // Scroll sync refs
   const timeScrollRef = useRef<HTMLDivElement>(null);
   const daysScrollRef = useRef<HTMLDivElement>(null);
 
-  const [items, setItems] = useState<CalendarItem[]>([
-    {
-      id: "1",
-      title: "Xu hướng AI trong 5 năm tới",
-      start: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 3, 9, 0).toISOString(),
-      end: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 3, 10, 0).toISOString(),
-      speaker: { name: "Nguyễn Văn A" },
-      room: "Phòng A1",
-    },
-    {
-      id: "2",
-      title: "Điện toán đám mây & Hạ tầng bền vững",
-      start: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 4, 13, 0).toISOString(),
-      end: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 4, 15, 0).toISOString(),
-      speaker: { name: "Trần Thị B" },
-      room: "Phòng A1",
-    },
-    {
-      id: "3",
-      title: "Bảo mật hệ thống trong kỷ nguyên AI",
-      start: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 5, 10, 0).toISOString(),
-      end: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 5, 12, 0).toISOString(),
-      speaker: { name: "Lê Văn C" },
-      room: "Phòng B1",
-    },
-  ]);
+  const [items, setItems] = useState<CalendarItem[]>([]);
 
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
   const itemsByDay = useMemo(() => {
-    const filtered = items.filter((it) => it.room === selectedRoom);
+    const filtered = items.filter((it) => it.room === (selectedRoom ?? ''));
     return weekDays.map((day) => {
       const dayItems = filtered.filter((it) => {
         const d = new Date(it.start);
@@ -186,13 +166,74 @@ const SessionSchedule = () => {
     };
   }, []);
 
+  // Load event, sessions and places
+  useEffect(() => {
+    const load = async () => {
+      if (!id) return;
+      // event
+      const ev = await safeRequest(() => api.get(`/organizer/events/${id}`));
+      const evData = (ev as any)?.data ?? ev ?? null;
+      if (evData) {
+        setEvent(evData);
+        const ended = evData.end_time ? new Date(evData.end_time) < new Date() : false;
+        setIsEditable(!ended);
+      }
+
+      // sessions for event
+      const s = await safeRequest(() => api.get(`/organizer/sessions/event/${id}`));
+      const sData = (s as any)?.data ?? s ?? null;
+      if (sData && Array.isArray(sData.data)) {
+        setItems(
+          sData.data.map((it: any) => ({
+            id: String(it.id),
+            title: it.title,
+            description: it.description,
+            start: it.start_time,
+            end: it.end_time,
+            speaker: it.speakers && it.speakers[0] ? { name: it.speakers[0].full_name, avatarUrl: it.speakers[0].photo_url } : undefined,
+            room: it.place,
+            files: [],
+          }))
+        )
+      }
+
+      // places for event
+      const p = await safeRequest(() => api.get(`/organizer/places/event/${id}`));
+      const pData = (p as any)?.data ?? p ?? [];
+      if (Array.isArray(pData)) {
+        setPlaces(pData.map((pl: any) => ({ id: pl.id || pl._id || pl.id, name: pl.name })));
+        if (pData.length > 0) setSelectedRoom(pData[0].name)
+      }
+    }
+
+    load()
+  }, [id, api, safeRequest])
+
   const handleAddRoom = () => {
     const v = newRoom.trim();
-    if (!v) return;
-    if (!rooms.includes(v)) setRooms((r) => [...r, v]);
-    setSelectedRoom(v);
-    setNewRoom("");
+    if (!v || !id) return;
+    // Call API to create place
+    (async () => {
+      const res = await safeRequest(() => api.post('/organizer/places', { event_id: id, name: v }))
+      const data = (res as any)?.data ?? res ?? null
+      if (data) {
+        setPlaces((ps) => [...ps, { id: data.id || data._id, name: data.name }])
+        setSelectedRoom(v)
+        setNewRoom('')
+      }
+    })()
   };
+
+  const handleDeleteRoom = async () => {
+    if (!selectedRoom) return;
+    const place = places.find((p) => p.name === selectedRoom);
+    if (!place) return;
+    const res = await safeRequest(() => api.delete(`/organizer/places/${place.id}`))
+    if (res !== undefined) {
+      setPlaces((ps) => ps.filter((p) => p.id !== place.id))
+      setSelectedRoom(places.length > 0 ? places[0]?.name : undefined)
+    }
+  }
 
   const handleOpenDialog = () => {
     // Initialize form with current date/time
@@ -239,28 +280,42 @@ const SessionSchedule = () => {
     if (!formData.title || !formData.startDate || !formData.startTime || !formData.endDate || !formData.endTime) {
       return; // Add validation error handling
     }
+    if (!isEditable) return;
 
     const startDateTime = new Date(`${formData.startDate}T${formData.startTime}`);
     const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
-    
-    const selectedSpeaker = speakers.find(s => s.id === formData.speaker);
-    
-    const newItem: CalendarItem = {
-      id: Date.now().toString(),
+
+    const payload: any = {
+      event_id: id,
       title: formData.title,
       description: formData.description,
-      start: startDateTime.toISOString(),
-      end: endDateTime.toISOString(),
-      speaker: selectedSpeaker ? { name: selectedSpeaker.name, avatarUrl: selectedSpeaker.avatarUrl } : undefined,
-      room: selectedRoom,
-      files: formData.files.length > 0 ? formData.files : undefined,
-    };
+      start_time: startDateTime.toISOString(),
+      end_time: endDateTime.toISOString(),
+      place: selectedRoom,
+      capacity: 50,
+    }
 
-    setItems(prev => [...prev, newItem]);
-    setIsDialogOpen(false);
+    ;(async () => {
+      const res = await safeRequest(() => api.post('/organizer/sessions', payload))
+      const data = (res as any)?.data ?? res ?? null
+      if (data) {
+        const newItem: CalendarItem = {
+          id: String(data.id || data._id || Date.now()),
+          title: data.title,
+          description: data.description,
+          start: data.start_time,
+          end: data.end_time,
+          speaker: undefined,
+          room: data.place,
+          files: [],
+        }
+        setItems(prev => [...prev, newItem])
+        setIsDialogOpen(false)
+      }
+    })()
   };
 
-  const canAddItem = !!selectedRoom;
+  const canAddItem = !!selectedRoom && isEditable;
 
   const headerDateStr = today.toLocaleDateString("vi-VN", { day: "2-digit", month: "long", year: "numeric" });
 
@@ -270,22 +325,25 @@ const SessionSchedule = () => {
         <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="text-lg font-medium">Hôm nay | {headerDateStr}</div>
-          <div className="flex items-center gap-2">
-            <Select value={selectedRoom} onValueChange={setSelectedRoom}>
+            <div className="flex items-center gap-2">
+            <Select value={selectedRoom} onValueChange={(v) => setSelectedRoom(v)}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="Chọn phòng" />
               </SelectTrigger>
               <SelectContent>
-                {rooms.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r}
+                {places.map((r) => (
+                  <SelectItem key={r.id} value={r.name}>
+                    {r.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Input value={newRoom} onChange={(e) => setNewRoom(e.target.value)} placeholder="Thêm phòng..." className="w-40" />
-            <Button variant="secondary" onClick={handleAddRoom}>
+            <Button variant="secondary" onClick={handleAddRoom} disabled={!isEditable}>
               Thêm mới
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteRoom} disabled={!isEditable || !selectedRoom}>
+              Xóa phòng
             </Button>
             <Button disabled={!canAddItem} onClick={handleOpenDialog}>
               Thêm lịch
@@ -349,7 +407,19 @@ const SessionSchedule = () => {
                             style={{ top, height, backgroundColor: color }}
                           >
                             <div className="p-3 space-y-2 text-sm">
-                              <div className="font-medium leading-tight line-clamp-2">{it.title}</div>
+                              <div className="flex justify-between items-start">
+                                <div className="font-medium leading-tight line-clamp-2">{it.title}</div>
+                                {isEditable && (
+                                  <button
+                                    className="ml-2 text-xs bg-black/20 rounded px-2 py-1"
+                                    onClick={async () => {
+                                      // delete session
+                                      const ok = await safeRequest(() => api.delete(`/organizer/sessions/${it.id}`));
+                                      if (ok !== undefined) setItems(prev => prev.filter(i => i.id !== it.id));
+                                    }}
+                                  >Xóa</button>
+                                )}
+                              </div>
                               <div className="flex items-center gap-2 text-xs opacity-90">
                                 <Avatar className="h-6 w-6 ring-2 ring-white/50">
                                   {it.speaker?.avatarUrl ? (

@@ -75,53 +75,60 @@ const EditConference = () => {
   useEffect(() => {
     const loadEvent = async () => {
       if (!id) return;
-      
-      const event = await safeRequest(() => api.get(`/organizer/events/${id}`));
-      if (event) {
-        // Parse event data
-        const startDate = new Date(event.start_time);
-        const endDate = new Date(event.end_time);
-        
-        setFormData({
-          name: event.name || "",
-          description: event.description || "",
-          category_id: event.category_id || "",
-          startDate: startDate.toISOString().split("T")[0],
-          startTime: startDate.toTimeString().slice(0, 5),
-          endDate: endDate.toISOString().split("T")[0],
-          endTime: endDate.toTimeString().slice(0, 5),
-          location: event.location || "",
-          lat: event.lat?.toString() || "",
-          lng: event.lng?.toString() || "",
-          capacity: event.capacity?.toString() || "",
-          tags: event.tags || [],
-        });
-        
-        if (event.thumbnail) {
-          setThumbnailPreview(event.thumbnail);
+
+      try {
+        const resp = await safeRequest(() => api.get(`/organizer/events/${id}`));
+        const event = (resp as any)?.data ?? resp ?? null;
+        if (event) {
+          // Parse event data safely
+          const startDate = event.start_time ? new Date(event.start_time) : null;
+          const endDate = event.end_time ? new Date(event.end_time) : null;
+
+          setFormData({
+            name: event.name || "",
+            description: event.description || "",
+            category_id: event.category_id || "",
+            startDate: startDate ? startDate.toISOString().split("T")[0] : "",
+            startTime: startDate ? startDate.toTimeString().slice(0, 5) : "",
+            endDate: endDate ? endDate.toISOString().split("T")[0] : "",
+            endTime: endDate ? endDate.toTimeString().slice(0, 5) : "",
+            location: event.location || "",
+            lat: event.lat?.toString() || "",
+            lng: event.lng?.toString() || "",
+            capacity: event.capacity?.toString() || "",
+            tags: event.tags || [],
+          });
+
+          if (event.thumbnail) {
+            setThumbnailPreview(event.thumbnail);
+          }
+          if (event.logo) {
+            setLogoPreview(event.logo);
+          }
+
+          // Load speakers
+          if (event.speakers && Array.isArray(event.speakers)) {
+            const speakersData: Speaker[] = event.speakers.map((speaker: any) => ({
+              id: speaker.id,
+              full_name: speaker.full_name || "",
+              bio: speaker.bio || "",
+              email: speaker.email || "",
+              phone: speaker.phone || "",
+              professional_title: speaker.professional_title || "",
+              linkedin_url: speaker.linkedin_url || "",
+              photo_url: speaker.photo_url,
+              avatar: null,
+              avatarPreview: speaker.photo_url || null,
+            }));
+            setSpeakers(speakersData);
+          }
         }
-        if (event.logo) {
-          setLogoPreview(event.logo);
-        }
-        
-        // Load speakers
-        if (event.speakers && Array.isArray(event.speakers)) {
-          const speakersData: Speaker[] = event.speakers.map((speaker: any) => ({
-            id: speaker.id,
-            full_name: speaker.full_name || "",
-            bio: speaker.bio || "",
-            email: speaker.email || "",
-            phone: speaker.phone || "",
-            professional_title: speaker.professional_title || "",
-            linkedin_url: speaker.linkedin_url || "",
-            photo_url: speaker.photo_url,
-            avatar: null,
-            avatarPreview: speaker.photo_url || null,
-          }));
-          setSpeakers(speakersData);
-        }
+      } catch (err) {
+        // safeRequest already shows errors via feedback, but ensure we don't crash
+        console.error("Failed to load event for edit:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     
     loadEvent();
@@ -392,7 +399,7 @@ const EditConference = () => {
   }
 
   return (
-    <ConferenceLayout showSidebar={false}>
+    <ConferenceLayout showSidebar={true}>
       <div className="max-w-6xl mx-auto py-6 px-6">
         <h1 className="font-heading text-4xl font-bold mb-8">Chỉnh sửa sự kiện</h1>
 
