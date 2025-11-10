@@ -1,85 +1,131 @@
 import { useState, useEffect } from "react";
-import { Upload, UserPlus, Plus, X, MapPin, MoreVertical } from "lucide-react";
+import { Upload, UserPlus, MoreVertical } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
+import { ConferenceLayout } from "@/components/layout/ConferenceLayout";
 import { Input } from "@/components/common/Input";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultiSelectTag } from "@/components/common/MultiSelectTag";
-import { ConferenceLayout } from "@/components/layout/ConferenceLayout";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { useApi } from "@/hooks/use-api";
 
 interface Speaker {
-  id: string;
-  name: string;
-  workplace: string;
-  description: string;
+  id: string | number;
+  full_name: string;
+  bio: string;
+  email: string;
+  phone: string;
+  professional_title: string;
+  linkedin_url: string;
+  photo_url?: string;
   avatar: File | null;
   avatarPreview: string | null;
 }
 
+const EVENT_CATEGORIES = [
+  { value: "ENVIRONMENT", label: "Môi trường" },
+  { value: "ECONOMY", label: "Kinh tế" },
+  { value: "EDUCATION", label: "Giáo dục" },
+  { value: "HEALTH", label: "Y tế" },
+  { value: "TECHNOLOGY", label: "Công nghệ" },
+];
+
 const EditConference = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { api, safeRequest } = useApi();
+  const [loading, setLoading] = useState(true);
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [logo, setLogo] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [isSpeakerModalOpen, setIsSpeakerModalOpen] = useState(false);
   const [editingSpeakerId, setEditingSpeakerId] = useState<string | null>(null);
   const [speakerForm, setSpeakerForm] = useState({
-    name: "",
-    workplace: "",
-    description: "",
+    full_name: "",
+    bio: "",
+    email: "",
+    phone: "",
+    professional_title: "",
+    linkedin_url: "",
     avatar: null as File | null,
     avatarPreview: null as string | null,
   });
-  
-  // Mock conference data - in real app, fetch from API using id
-  const mockConferenceData = {
-    title: "Hội nghị Công nghệ Số Việt Nam 2025",
-    description: "Hội nghị Công nghệ Số Việt Nam 2025 là sự kiện thường niên quy tụ các chuyên gia, doanh nghiệp và sinh viên yêu thích công nghệ.",
-    category: "technology",
-    startDate: "2025-10-04",
-    startTime: "09:00",
-    endDate: "2025-10-05",
-    endTime: "17:00",
-    location: "Trung tâm hội nghị Quốc Gia, TP. Hà Nội",
-    maxRegistrations: "100000",
-    socialLinks: ["https://facebook.com/hoinghi", "https://twitter.com/hoinghi"],
-    image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=80",
-  };
-
   const [formData, setFormData] = useState({
-    title: "",
+    name: "",
     description: "",
-    category: "",
+    category_id: "",
     startDate: "",
     startTime: "",
     endDate: "",
     endTime: "",
     location: "",
-    maxRegistrations: "",
-    socialLinks: [""] as string[],
+    lat: "",
+    lng: "",
+    capacity: "",
+    tags: [] as string[],
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load conference data on mount
+  // Load event data
   useEffect(() => {
-    // In real app, fetch conference data from API
-    setFormData({
-      title: mockConferenceData.title,
-      description: mockConferenceData.description || "",
-      category: mockConferenceData.category,
-      startDate: mockConferenceData.startDate,
-      startTime: mockConferenceData.startTime,
-      endDate: mockConferenceData.endDate,
-      endTime: mockConferenceData.endTime,
-      location: mockConferenceData.location,
-      maxRegistrations: mockConferenceData.maxRegistrations,
-      socialLinks: mockConferenceData.socialLinks.length > 0 ? mockConferenceData.socialLinks : [""],
-    });
-    setThumbnailPreview(mockConferenceData.image);
-  }, [id]);
+    const loadEvent = async () => {
+      if (!id) return;
+      
+      const event = await safeRequest(() => api.get(`/organizer/events/${id}`));
+      if (event) {
+        // Parse event data
+        const startDate = new Date(event.start_time);
+        const endDate = new Date(event.end_time);
+        
+        setFormData({
+          name: event.name || "",
+          description: event.description || "",
+          category_id: event.category_id || "",
+          startDate: startDate.toISOString().split("T")[0],
+          startTime: startDate.toTimeString().slice(0, 5),
+          endDate: endDate.toISOString().split("T")[0],
+          endTime: endDate.toTimeString().slice(0, 5),
+          location: event.location || "",
+          lat: event.lat?.toString() || "",
+          lng: event.lng?.toString() || "",
+          capacity: event.capacity?.toString() || "",
+          tags: event.tags || [],
+        });
+        
+        if (event.thumbnail) {
+          setThumbnailPreview(event.thumbnail);
+        }
+        if (event.logo) {
+          setLogoPreview(event.logo);
+        }
+        
+        // Load speakers
+        if (event.speakers && Array.isArray(event.speakers)) {
+          const speakersData: Speaker[] = event.speakers.map((speaker: any) => ({
+            id: speaker.id,
+            full_name: speaker.full_name || "",
+            bio: speaker.bio || "",
+            email: speaker.email || "",
+            phone: speaker.phone || "",
+            professional_title: speaker.professional_title || "",
+            linkedin_url: speaker.linkedin_url || "",
+            photo_url: speaker.photo_url,
+            avatar: null,
+            avatarPreview: speaker.photo_url || null,
+          }));
+          setSpeakers(speakersData);
+        }
+      }
+      setLoading(false);
+    };
+    
+    loadEvent();
+  }, [id, api, safeRequest]);
 
   const handleThumbnailUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -93,23 +139,15 @@ const EditConference = () => {
     }
   };
 
-  const handleSocialLinkChange = (index: number, value: string) => {
-    const newLinks = [...formData.socialLinks];
-    newLinks[index] = value;
-    setFormData({ ...formData, socialLinks: newLinks });
-  };
-
-  const handleAddSocialLink = () => {
-    setFormData({
-      ...formData,
-      socialLinks: [...formData.socialLinks, ""],
-    });
-  };
-
-  const handleRemoveSocialLink = (index: number) => {
-    if (formData.socialLinks.length > 1) {
-      const newLinks = formData.socialLinks.filter((_, i) => i !== index);
-      setFormData({ ...formData, socialLinks: newLinks });
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogo(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -126,13 +164,16 @@ const EditConference = () => {
 
   const handleOpenSpeakerModal = (speakerId?: string) => {
     if (speakerId) {
-      const speaker = speakers.find((s) => s.id === speakerId);
+      const speaker = speakers.find((s) => s.id.toString() === speakerId);
       if (speaker) {
         setEditingSpeakerId(speakerId);
         setSpeakerForm({
-          name: speaker.name,
-          workplace: speaker.workplace,
-          description: speaker.description,
+          full_name: speaker.full_name,
+          bio: speaker.bio,
+          email: speaker.email,
+          phone: speaker.phone,
+          professional_title: speaker.professional_title,
+          linkedin_url: speaker.linkedin_url,
           avatar: speaker.avatar,
           avatarPreview: speaker.avatarPreview,
         });
@@ -140,9 +181,12 @@ const EditConference = () => {
     } else {
       setEditingSpeakerId(null);
       setSpeakerForm({
-        name: "",
-        workplace: "",
-        description: "",
+        full_name: "",
+        bio: "",
+        email: "",
+        phone: "",
+        professional_title: "",
+        linkedin_url: "",
         avatar: null,
         avatarPreview: null,
       });
@@ -154,29 +198,34 @@ const EditConference = () => {
     setIsSpeakerModalOpen(false);
     setEditingSpeakerId(null);
     setSpeakerForm({
-      name: "",
-      workplace: "",
-      description: "",
+      full_name: "",
+      bio: "",
+      email: "",
+      phone: "",
+      professional_title: "",
+      linkedin_url: "",
       avatar: null,
       avatarPreview: null,
     });
   };
 
   const handleSaveSpeaker = () => {
-    if (!speakerForm.name.trim() || !speakerForm.workplace.trim()) {
+    if (!speakerForm.full_name.trim() || !speakerForm.email.trim()) {
       return;
     }
 
     if (editingSpeakerId) {
-      // Update existing speaker
       setSpeakers(
         speakers.map((speaker) =>
-          speaker.id === editingSpeakerId
+          speaker.id.toString() === editingSpeakerId
             ? {
                 ...speaker,
-                name: speakerForm.name,
-                workplace: speakerForm.workplace,
-                description: speakerForm.description,
+                full_name: speakerForm.full_name,
+                bio: speakerForm.bio,
+                email: speakerForm.email,
+                phone: speakerForm.phone,
+                professional_title: speakerForm.professional_title,
+                linkedin_url: speakerForm.linkedin_url,
                 avatar: speakerForm.avatar,
                 avatarPreview: speakerForm.avatarPreview,
               }
@@ -184,12 +233,14 @@ const EditConference = () => {
         )
       );
     } else {
-      // Add new speaker
       const newSpeaker: Speaker = {
         id: Date.now().toString(),
-        name: speakerForm.name,
-        workplace: speakerForm.workplace,
-        description: speakerForm.description,
+        full_name: speakerForm.full_name,
+        bio: speakerForm.bio,
+        email: speakerForm.email,
+        phone: speakerForm.phone,
+        professional_title: speakerForm.professional_title,
+        linkedin_url: speakerForm.linkedin_url,
         avatar: speakerForm.avatar,
         avatarPreview: speakerForm.avatarPreview,
       };
@@ -200,7 +251,7 @@ const EditConference = () => {
 
   const handleDeleteSpeaker = () => {
     if (editingSpeakerId) {
-      setSpeakers(speakers.filter((speaker) => speaker.id !== editingSpeakerId));
+      setSpeakers(speakers.filter((speaker) => speaker.id.toString() !== editingSpeakerId));
       handleCloseSpeakerModal();
     }
   };
@@ -213,36 +264,144 @@ const EditConference = () => {
     return (first + last).toUpperCase();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Update conference data via API
-    console.log("Updating conference:", { ...formData, thumbnail, speakers });
-    navigate(`/conference/${id}`);
+    if (!id) return;
+    
+    setIsSubmitting(true);
+
+    try {
+      // Combine date and time
+      const start_time = new Date(`${formData.startDate}T${formData.startTime}`).toISOString();
+      const end_time = new Date(`${formData.endDate}T${formData.endTime}`).toISOString();
+
+      // Prepare update data
+      const updateData: any = {
+        name: formData.name,
+        description: formData.description || "",
+        start_time,
+        end_time,
+        location: formData.location,
+        lat: parseFloat(formData.lat),
+        lng: parseFloat(formData.lng),
+        capacity: parseInt(formData.capacity),
+      };
+
+      if (formData.category_id) {
+        updateData.category_id = formData.category_id;
+      }
+      if (formData.tags.length > 0) {
+        updateData.tags = formData.tags;
+      }
+      if (thumbnailPreview && !thumbnail) {
+        // Existing thumbnail URL
+        updateData.thumbnail = thumbnailPreview;
+      }
+      if (logoPreview && !logo) {
+        // Existing logo URL
+        updateData.logo = logoPreview;
+      }
+
+      // Prepare speakers data
+      const speakersData = speakers.map((speaker) => ({
+        full_name: speaker.full_name,
+        bio: speaker.bio,
+        email: speaker.email,
+        phone: speaker.phone,
+        professional_title: speaker.professional_title,
+        linkedin_url: speaker.linkedin_url,
+        photo_url: speaker.avatar ? undefined : speaker.photo_url, // Keep existing if no new file
+      }));
+
+      updateData.speakers = speakersData;
+
+      // If there are new files, use FormData, otherwise use JSON
+      if (thumbnail || logo || speakers.some(s => s.avatar)) {
+        const formDataToSend = new FormData();
+        Object.keys(updateData).forEach((key) => {
+          if (key === "speakers") {
+            formDataToSend.append("speakers_json", JSON.stringify(updateData.speakers));
+          } else if (key === "tags" && Array.isArray(updateData[key])) {
+            updateData[key].forEach((tag: string) => {
+              formDataToSend.append("tags[]", tag);
+            });
+          } else if (updateData[key] !== undefined && updateData[key] !== null) {
+            formDataToSend.append(key, updateData[key]);
+          }
+        });
+
+        if (thumbnail) {
+          formDataToSend.append("thumbnail", thumbnail);
+        }
+        if (logo) {
+          formDataToSend.append("logo", logo);
+        }
+
+        speakers.forEach((speaker, index) => {
+          if (speaker.avatar) {
+            formDataToSend.append(`speakers[${index}][photo_url]`, speaker.avatar);
+          }
+        });
+
+        const result = await safeRequest(() =>
+          api.put(`/organizer/events/${id}`, formDataToSend, {
+            sendJson: false,
+          })
+        );
+
+        if (result) {
+          navigate(`/conference/${id}/dashboard`);
+        }
+      } else {
+        // No new files, send as JSON
+        const result = await safeRequest(() =>
+          api.put(`/organizer/events/${id}`, updateData)
+        );
+
+        if (result) {
+          navigate(`/conference/${id}/dashboard`);
+        }
+      }
+    } catch (error) {
+      console.error("Error updating event:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDelete = () => {
-    if (confirm("Bạn có chắc chắn muốn xóa hội nghị này?")) {
-      // TODO: Delete conference via API
-      console.log("Deleting conference:", id);
+  const handleDelete = async () => {
+    if (!id) return;
+    if (!confirm("Bạn có chắc chắn muốn xóa sự kiện này?")) {
+      return;
+    }
+
+    const result = await safeRequest(() => api.delete(`/organizer/events/${id}`));
+    if (result !== undefined) {
       navigate("/dashboard");
     }
   };
 
-  return (
-    <ConferenceLayout sidebarTitle="Hội nghị Công nghệ Số Việt Nam 2025">
-      <div className="px-6 py-6">
-        <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <h1 className="font-heading text-4xl font-bold mb-8">Chỉnh sửa hội nghị</h1>
+  if (loading) {
+    return (
+      <ConferenceLayout showSidebar={false}>
+        <div className="flex items-center justify-center h-screen">
+          <p>Đang tải...</p>
+        </div>
+      </ConferenceLayout>
+    );
+  }
 
-        {/* Main layout */}
+  return (
+    <ConferenceLayout showSidebar={false}>
+      <div className="max-w-6xl mx-auto py-6 px-6">
+        <h1 className="font-heading text-4xl font-bold mb-8">Chỉnh sửa sự kiện</h1>
+
         <div className="relative grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Form */}
           <form
             onSubmit={handleSubmit}
             className="lg:col-span-2 bg-card rounded-xl p-8 space-y-6 shadow-sm"
           >
-            {/* Upload */}
+            {/* Thumbnail Upload */}
             <div
               className="border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center py-10 text-center cursor-pointer hover:border-primary transition-colors"
               onClick={() => document.getElementById("thumbnail-input")?.click()}
@@ -266,90 +425,98 @@ const EditConference = () => {
               ) : (
                 <>
                   <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">Tải hình ảnh mới ở đây</p>
+                  <p className="text-sm text-muted-foreground">Tải hình ảnh thumbnail</p>
+                </>
+              )}
+            </div>
+
+            {/* Logo Upload */}
+            <div
+              className="border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center py-10 text-center cursor-pointer hover:border-primary transition-colors"
+              onClick={() => document.getElementById("logo-input")?.click()}
+            >
+              <input
+                id="logo-input"
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+                className="hidden"
+              />
+              {logoPreview ? (
+                <div className="space-y-2">
+                  <img
+                    src={logoPreview}
+                    alt="Logo preview"
+                    className="max-h-32 mx-auto rounded-lg"
+                  />
+                  <p className="text-sm text-muted-foreground">Nhấn để thay đổi logo</p>
+                </div>
+              ) : (
+                <>
+                  <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">Tải logo (tùy chọn)</p>
                 </>
               )}
             </div>
 
             {/* Name */}
             <Input
-              label="Tên hội nghị *"
-              placeholder="Nhập tên của hội nghị tại đây..."
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              label="Tên sự kiện *"
+              placeholder="Nhập tên của sự kiện tại đây..."
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
             />
 
             {/* Description */}
             <div className="space-y-2">
-              <Label className="text-base font-medium">Mô tả hội nghị</Label>
+              <Label className="text-base font-medium">Mô tả sự kiện</Label>
               <Textarea
-                placeholder="Nhập mô tả về hội nghị..."
+                placeholder="Nhập mô tả về sự kiện..."
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={4}
               />
             </div>
 
-            {/* Social Links */}
+            {/* Category */}
             <div className="space-y-2">
-              <Label className="text-base font-medium">
-                Thông tin liên hệ *
-              </Label>
-              {formData.socialLinks.map((link, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Input
-                    placeholder="Nhập URL (ví dụ: https://facebook.com/...)"
-                    value={link}
-                    onChange={(e) => handleSocialLinkChange(index, e.target.value)}
-                    className="flex-1"
-                  />
-                  {formData.socialLinks.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleRemoveSocialLink(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleAddSocialLink}
-                className="w-full"
+              <Label className="text-base font-medium">Danh mục</Label>
+              <Select
+                value={formData.category_id}
+                onValueChange={(value) => setFormData({ ...formData, category_id: value })}
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Thêm liên kết
-              </Button>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn danh mục" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EVENT_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Category */}
+            {/* Tags */}
             <MultiSelectTag
-              label="Thể loại của hội nghị"
-              placeholder="Chọn thể loại"
-              options={[
-                { value: "technology", label: "Công nghệ" },
-                { value: "education", label: "Giáo dục" },
-                { value: "business", label: "Kinh doanh" },
-              ]}
-              value={formData.category ? formData.category.split(",") : []}
-              onChange={(selected) =>
-                setFormData({ ...formData, category: selected.join(",") })
-              }
+              label="Thẻ (Tags)"
+              placeholder="Thêm thẻ"
+              options={[]}
+              value={formData.tags}
+              onChange={(selected) => setFormData({ ...formData, tags: selected })}
             />
 
-            {/* Max Registrations */}
+            {/* Capacity */}
             <Input
               label="Số lượng người tham gia tối đa *"
               type="number"
               placeholder="Nhập số lượng tại đây"
-              value={formData.maxRegistrations}
-              onChange={(e) => setFormData({ ...formData, maxRegistrations: e.target.value })}
+              value={formData.capacity}
+              onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
               required
+              min="1"
             />
 
             {/* Time */}
@@ -360,14 +527,16 @@ const EditConference = () => {
                   <Label className="text-sm text-muted-foreground">Từ</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <Input
-                      type="time"
-                      value={formData.startTime}
-                      onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                    />
-                    <Input
                       type="date"
                       value={formData.startDate}
                       onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                      required
+                    />
+                    <Input
+                      type="time"
+                      value={formData.startTime}
+                      onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                      required
                     />
                   </div>
                 </div>
@@ -375,14 +544,16 @@ const EditConference = () => {
                   <Label className="text-sm text-muted-foreground">Đến</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <Input
-                      type="time"
-                      value={formData.endTime}
-                      onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                    />
-                    <Input
                       type="date"
                       value={formData.endDate}
                       onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                      required
+                    />
+                    <Input
+                      type="time"
+                      value={formData.endTime}
+                      onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                      required
                     />
                   </div>
                 </div>
@@ -392,27 +563,42 @@ const EditConference = () => {
             {/* Location */}
             <div className="space-y-2">
               <Label className="text-base font-medium">Địa điểm tổ chức *</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="Trung tâm hội nghị Quốc Gia, TP. Hà Nội"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  required
-                  className="flex-1"
-                />
-                <Button type="button" variant="outline">
-                  <MapPin className="h-4 w-4 mr-2" />
-                  Chọn trên Map
-                </Button>
-              </div>
+              <Input
+                placeholder="Trung tâm hội nghị Quốc Gia, TP. Hà Nội"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                required
+              />
+            </div>
+
+            {/* Coordinates */}
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Vĩ độ (Latitude) *"
+                type="number"
+                step="any"
+                placeholder="21.0285"
+                value={formData.lat}
+                onChange={(e) => setFormData({ ...formData, lat: e.target.value })}
+                required
+              />
+              <Input
+                label="Kinh độ (Longitude) *"
+                type="number"
+                step="any"
+                placeholder="105.8542"
+                value={formData.lng}
+                onChange={(e) => setFormData({ ...formData, lng: e.target.value })}
+                required
+              />
             </div>
 
             <div className="flex justify-between gap-4 pt-4">
               <Button type="button" variant="destructive" onClick={handleDelete}>
-                Xóa hội nghị
+                Xóa sự kiện
               </Button>
-              <Button type="submit" className="px-8">
-                Lưu thông tin
+              <Button type="submit" className="px-8" disabled={isSubmitting}>
+                {isSubmitting ? "Đang cập nhật..." : "Lưu thông tin"}
               </Button>
             </div>
           </form>
@@ -429,9 +615,7 @@ const EditConference = () => {
               </div>
 
               {speakers.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center 
-                justify-center text-center text-muted-foreground border 
-                border-t-2 border-b-2 border-r-0 border-l-0 py-28">
+                <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground border border-t-2 border-b-2 border-r-0 border-l-0 py-28">
                   <div className="mb-3">
                     <Upload className="w-10 h-10 mx-auto text-muted-foreground" />
                   </div>
@@ -446,19 +630,21 @@ const EditConference = () => {
                     >
                       <Avatar className="h-16 w-16">
                         {speaker.avatarPreview ? (
-                          <AvatarImage src={speaker.avatarPreview} alt={speaker.name} />
+                          <AvatarImage src={speaker.avatarPreview} alt={speaker.full_name} />
                         ) : (
-                          <AvatarFallback>{getInitials(speaker.name)}</AvatarFallback>
+                          <AvatarFallback>{getInitials(speaker.full_name)}</AvatarFallback>
                         )}
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-base truncate">{speaker.name}</h3>
-                        <p className="text-sm text-muted-foreground truncate">{speaker.workplace}</p>
+                        <h3 className="font-semibold text-base truncate">{speaker.full_name}</h3>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {speaker.professional_title || speaker.email}
+                        </p>
                       </div>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleOpenSpeakerModal(speaker.id)}
+                        onClick={() => handleOpenSpeakerModal(speaker.id.toString())}
                         className="flex-shrink-0"
                       >
                         <MoreVertical className="h-5 w-5" />
@@ -470,57 +656,85 @@ const EditConference = () => {
             </div>
           </div>
         </div>
-        </div>
       </div>
 
-      {/* Speaker Modal */}
+      {/* Speaker Modal - Same as CreateConference */}
       <Dialog open={isSpeakerModalOpen} onOpenChange={setIsSpeakerModalOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingSpeakerId ? "Chỉnh sửa diễn giả" : "Thêm diễn giả"}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
-            {/* Left Column - Form Fields */}
             <div className="md:col-span-2 space-y-4">
-              {/* Speaker Name */}
               <div className="space-y-2">
                 <Label className="text-base font-medium">
                   Họ và tên diễn giả <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   placeholder="Nguyễn Văn A"
-                  value={speakerForm.name}
-                  onChange={(e) => setSpeakerForm({ ...speakerForm, name: e.target.value })}
+                  value={speakerForm.full_name}
+                  onChange={(e) => setSpeakerForm({ ...speakerForm, full_name: e.target.value })}
                   required
                 />
               </div>
 
-              {/* Workplace */}
               <div className="space-y-2">
                 <Label className="text-base font-medium">
-                  Vị trí, nơi công tác <span className="text-destructive">*</span>
+                  Email <span className="text-destructive">*</span>
                 </Label>
                 <Input
-                  placeholder="CEO Công ty ABC Tech"
-                  value={speakerForm.workplace}
-                  onChange={(e) => setSpeakerForm({ ...speakerForm, workplace: e.target.value })}
+                  type="email"
+                  placeholder="example@email.com"
+                  value={speakerForm.email}
+                  onChange={(e) => setSpeakerForm({ ...speakerForm, email: e.target.value })}
                   required
                 />
               </div>
 
-              {/* Description */}
+              <div className="space-y-2">
+                <Label className="text-base font-medium">Số điện thoại</Label>
+                <Input
+                  type="tel"
+                  placeholder="0123456789"
+                  value={speakerForm.phone}
+                  onChange={(e) => setSpeakerForm({ ...speakerForm, phone: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-base font-medium">Chức danh / Vị trí công tác</Label>
+                <Input
+                  placeholder="CEO Công ty ABC Tech"
+                  value={speakerForm.professional_title}
+                  onChange={(e) =>
+                    setSpeakerForm({ ...speakerForm, professional_title: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-base font-medium">LinkedIn URL</Label>
+                <Input
+                  type="url"
+                  placeholder="https://linkedin.com/in/..."
+                  value={speakerForm.linkedin_url}
+                  onChange={(e) =>
+                    setSpeakerForm({ ...speakerForm, linkedin_url: e.target.value })
+                  }
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label className="text-base font-medium">Giới thiệu, mô tả</Label>
                 <Textarea
-                  placeholder="Với hơn 15 năm kinh nghiệm trong phát triển hệ thống AI cho doanh nghiệp, ông Nguyễn Văn A sẽ chia sẻ về các xu hướng công nghệ đang định hình tương lai trí tuệ nhân tạo tại Việt Nam."
-                  value={speakerForm.description}
-                  onChange={(e) => setSpeakerForm({ ...speakerForm, description: e.target.value })}
+                  placeholder="Với hơn 15 năm kinh nghiệm trong phát triển hệ thống AI cho doanh nghiệp..."
+                  value={speakerForm.bio}
+                  onChange={(e) => setSpeakerForm({ ...speakerForm, bio: e.target.value })}
                   rows={6}
                 />
               </div>
             </div>
 
-            {/* Right Column - Avatar Upload */}
             <div className="space-y-2">
               <Label className="text-base font-medium">Ảnh đại diện</Label>
               <div
@@ -563,7 +777,10 @@ const EditConference = () => {
               <Button variant="outline" onClick={handleCloseSpeakerModal}>
                 Hủy
               </Button>
-              <Button onClick={handleSaveSpeaker} disabled={!speakerForm.name.trim() || !speakerForm.workplace.trim()}>
+              <Button
+                onClick={handleSaveSpeaker}
+                disabled={!speakerForm.full_name.trim() || !speakerForm.email.trim()}
+              >
                 Lưu thông tin
               </Button>
             </div>
@@ -575,4 +792,3 @@ const EditConference = () => {
 };
 
 export default EditConference;
-
