@@ -22,13 +22,16 @@ const AdminDashboard = () => {
   const [year, setYear] = useState<number>(now.getFullYear())
   const [month, setMonth] = useState<number>(now.getMonth() + 1)
   const [limit, setLimit] = useState<number>(3)
+  const [timeWindow, setTimeWindow] = useState<'day' | 'month' | 'year'>('month')
+  const todayStr = now.toISOString().slice(0, 10) // YYYY-MM-DD
 
-  const load = async (params?: { year?: number; month?: number; limit?: number }) => {
+  const load = async (params?: { year?: number; month?: number; limit?: number; day?: string }) => {
     safeRequest(async () => {
       const q: Record<string, string | number> = {}
       if (params?.year) q.year = params.year
       if (params?.month) q.month = params.month
       if (params?.limit) q.limit = params.limit
+      if (params?.day) q.day = params.day
       const qs = new URLSearchParams(q as Record<string, string>).toString()
       const path = `/admin/stats${qs ? `?${qs}` : ''}`
       const res = await api.get(path) as any
@@ -42,7 +45,12 @@ const AdminDashboard = () => {
   }
 
   useEffect(() => {
-    load({ year, month, limit })
+    // determine params according to timeWindow
+    const params: any = { limit }
+    if (timeWindow === 'day') params.day = todayStr
+    if (timeWindow === 'month') { params.year = year; params.month = month }
+    if (timeWindow === 'year') { params.year = year }
+    load(params)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -73,6 +81,14 @@ const AdminDashboard = () => {
       <div className="mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div>
+            <label className="text-xs text-muted-foreground">Window</label>
+            <select value={timeWindow} onChange={(e) => setTimeWindow(e.target.value as any)} className="ml-2 p-2 rounded border">
+              <option value="day">This day</option>
+              <option value="month">This month</option>
+              <option value="year">This year</option>
+            </select>
+          </div>
+          <div>
             <label className="text-xs text-muted-foreground">Năm</label>
             <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="ml-2 p-2 rounded border">
               {Array.from({ length: 3 }).map((_, i) => {
@@ -97,7 +113,13 @@ const AdminDashboard = () => {
             <input type="number" min={1} max={10} value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="ml-2 w-20 p-2 rounded border" />
           </div>
 
-          <button onClick={() => load({ year, month, limit })} className="ml-3 px-3 py-2 bg-primary text-white rounded">Tải lại</button>
+          <button onClick={() => {
+            const params: any = { limit }
+            if (timeWindow === 'day') params.day = todayStr
+            if (timeWindow === 'month') { params.year = year; params.month = month }
+            if (timeWindow === 'year') { params.year = year }
+            load(params)
+          }} className="ml-3 px-3 py-2 bg-primary text-white rounded">Tải lại</button>
         </div>
 
         <div className="text-sm text-muted-foreground">Dữ liệu được cache 60s (có thể cấu hình)</div>
@@ -108,10 +130,18 @@ const AdminDashboard = () => {
           <PieChartCard 
             title="Số hội nghị theo chuyên mục (tháng này)" 
             data={pieData.map((p, idx) => ({ ...p, color: idx % 2 === 0 ? 'hsl(var(--primary))' : 'hsl(var(--foreground))' }))} 
+            initialYear={year}
+            initialMonth={month}
+            initialLimit={limit}
+            initialWindow={timeWindow}
+            initialDay={todayStr}
           />
           <BarChartCard 
             title="Số hội nghị theo tháng (năm hiện tại)" 
             data={barData.map(b => ({ name: String(b.month), value: b.value }))} 
+            initialYear={year}
+            initialWindow={timeWindow}
+            initialDay={todayStr}
           />
         </div>
 

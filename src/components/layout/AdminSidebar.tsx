@@ -16,13 +16,13 @@ export const AdminSidebar = () => {
     await logout();
   };
   return (
-    <aside className="w-64 bg-card border-r min-h-screen flex flex-col">
+    <aside className="w-64 bg-card border-r h-screen sticky top-0 flex flex-col">
       <div className="p-6">
         <h1 className="text-xl font-bold">Conferdent</h1>
         <p className="text-sm text-muted-foreground">Admin Console</p>
       </div>
 
-      <nav className="flex-1 px-4 space-y-1">
+      <nav className="px-4 space-y-1 overflow-y-auto">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
@@ -42,7 +42,7 @@ export const AdminSidebar = () => {
         ))}
       </nav>
 
-      <div className="p-4">
+      <div className="p-4 mt-auto">
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-foreground hover:bg-accent w-full"

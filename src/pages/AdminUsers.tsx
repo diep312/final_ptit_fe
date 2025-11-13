@@ -6,6 +6,7 @@ import { Search, Eye, Edit, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApi } from "@/hooks/use-api";
 import AdminUserForm from "@/components/admin/AdminUserForm";
+import AdminUserView from "@/components/admin/AdminUserView";
 
 interface UserRow {
   _id: string;
@@ -22,6 +23,7 @@ const AdminUsers = () => {
   const { safeRequest, api } = useApi();
   const [openCreate, setOpenCreate] = useState(false)
   const [editing, setEditing] = useState<UserRow | null>(null)
+  const [viewing, setViewing] = useState<UserRow | null>(null)
 
   const reload = async () => {
     await safeRequest(async () => {
@@ -140,6 +142,7 @@ const AdminUsers = () => {
                           variant="ghost"
                           size="icon"
                           className="text-muted-foreground hover:text-foreground"
+                          onClick={() => setViewing(user)}
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
@@ -199,6 +202,12 @@ const AdminUsers = () => {
         initial={editing}
         role={editing?.role === 'admin' ? 'admin' : 'organizer'}
         onSaved={() => { setEditing(null); void reload() }}
+      />
+      <AdminUserView
+        open={!!viewing}
+        onOpenChange={(v) => { if (!v) setViewing(null) }}
+        id={viewing?._id}
+        role={viewing?.role}
       />
     </AdminLayout>
   );

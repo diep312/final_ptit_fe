@@ -15,7 +15,7 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
       
       <div className="flex-1 flex flex-col">
         {/* Top Bar */}
-        <header className="bg-card border-b">
+        <header className="sticky top-0 z-10 bg-card border-b">
           <div className="max-w-7xl mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex-1 max-w-md">
@@ -44,7 +44,7 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1">
+        <main className="flex-1 overflow-auto">
           <div className="max-w-7xl mx-auto p-6">{children}</div>
         </main>
       </div>

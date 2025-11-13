@@ -390,9 +390,9 @@ const SessionSchedule = () => {
                 const { dayOfWeek, dateStr } = formatDateLabel(d);
                 const isTodayCol = d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
                 return (
-                  <div key={i} className={`px-4 py-3 ${isTodayCol ? 'bg-gray-50' : ''}`}>
-                    <div className="text-sm font-medium">{dayOfWeek}</div>
-                    <div className="text-xs text-muted-foreground">{dateStr}</div>
+                  <div key={i} className={`px-4 py-3 items-center flex-col ${isTodayCol ? 'bg-gray-50' : ''}`}>
+                    <div className="text-l font-medium align-center font-heading self-center">{dayOfWeek}</div>
+                    <div className="text-xs text-muted-foreground align-center self-center">{dateStr}</div>
                   </div>
                 );
               })}
@@ -406,7 +406,7 @@ const SessionSchedule = () => {
                 {Array.from({ length: 24 }, (_, h) => (
                   <div key={h} className="absolute left-0 right-0" style={{ top: h * HOUR_HEIGHT }}>
                     <div className="h-px bg-border" />
-                    <div className="text-xs text-muted-foreground mt-[-10px] pl-2">{`${String(h).padStart(2, "0")}:00`}</div>
+                    <div className="text-xs text-black mt-[-10px] pl-2 bg-white font-heading text-bold">{`${String(h).padStart(2, "0")}:00`}</div>
                   </div>
                 ))}
               </div>

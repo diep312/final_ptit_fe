@@ -29,9 +29,17 @@ const ConferenceDetail = () => {
       if (evData) setEvent(evData);
 
       // load sessions (backend should expose: GET /organizer/events/:id/sessions)
-      const sRes = await safeRequest(() => api.get(`/organizer/events/${id}/sessions`));
-      const sData = (sRes as any)?.data ?? sRes ?? [];
-      setSessions(Array.isArray(sData) ? sData : []);
+        const sRes = await safeRequest(() => api.get(`/organizer/events/${id}/sessions`));
+        // backend may return wrapped responses: { status, success, message, data: { data: sessions, total } }
+        // or { status, success, message, data: sessions } or plain array
+        const rawS = (sRes as any) ?? [];
+        const maybeData = rawS.data ?? rawS
+        const sessionsArray = Array.isArray(maybeData)
+          ? maybeData
+          : Array.isArray(maybeData?.data)
+          ? maybeData.data
+          : [];
+        setSessions(sessionsArray);
 
       // load statistics (backend should expose: GET /organizer/events/:id/statistics)
       const stRes = await safeRequest(() => api.get(`/organizer/events/${id}/statistics`));
@@ -67,14 +75,30 @@ const ConferenceDetail = () => {
 
   const participation = statistics.registered > 0 ? `${Math.round((statistics.checkedIn / statistics.registered) * 100)}%` : "0%";
 
-  const schedule = sessions.length
-    ? sessions.map((s: any) => ({
-        time: s.start && s.end ? `${new Date(s.start).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} - ${new Date(s.end).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}` : s.time ?? "",
-        title: s.title ?? s.name ?? "Phiên",
-        description: s.description,
-        room: s.room ?? s.location ?? "",
-        speakers: s.speakers ? s.speakers.map((sp: any) => sp.full_name ?? sp.name) : s.speaker ? [s.speaker] : [],
-      }))
+      const schedule = sessions.length
+    ? sessions.map((s: any) => {
+        // session fields from backend: start_time, end_time, place, title, description, speakers (array)
+        const start = s.start_time ? new Date(s.start_time) : s.start ? new Date(s.start) : null;
+        const end = s.end_time ? new Date(s.end_time) : s.end ? new Date(s.end) : null;
+        const timeStr = start && end
+          ? `${start.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} - ${end.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`
+          : s.time ?? "";
+
+        const speakers = Array.isArray(s.speakers)
+          ? s.speakers.map((sp: any) => ({ name: sp.full_name ?? sp.name ?? sp.title ?? "", avatarUrl: sp.photo_url ?? sp.avatar ?? sp.avatar_url }))
+          : s.speaker
+          ? [ { name: s.speaker } ]
+          : [];
+
+        return {
+          time: timeStr,
+          title: s.title ?? s.name ?? "Phiên",
+          description: s.description ?? s.prerequisites ?? "",
+          room: s.place ?? s.room ?? s.location ?? "",
+          speaker: speakers && speakers.length > 0 ? speakers[0].name : "",
+          speakers,
+        };
+      })
     : [];
 
   const hourlyData = statistics.hourly && statistics.hourly.length > 0 ? statistics.hourly.map((h) => ({ hour: h.hour, count: h.count })) : [];

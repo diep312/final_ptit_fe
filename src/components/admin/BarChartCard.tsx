@@ -11,20 +11,28 @@ interface BarChartCardProps {
   title: string;
   data?: BarChartData[];
   initialYear?: number;
+  initialWindow?: 'day' | 'month' | 'year';
+  initialDay?: string;
 }
 
-export const BarChartCard = ({ title, data: initialData, initialYear }: BarChartCardProps) => {
+export const BarChartCard = ({ title, data: initialData, initialYear, initialWindow, initialDay }: BarChartCardProps) => {
   const { api, safeRequest } = useApi()
   const now = new Date()
   const [year, setYear] = useState<number>(initialYear ?? now.getFullYear())
   const [data, setData] = useState<BarChartData[]>(initialData ?? [])
   const [loading, setLoading] = useState(false)
 
+  // Keep local state in sync when parent passes new data
+  useEffect(() => {
+    if (initialData) setData(initialData)
+  }, [initialData])
+
   const load = async (opts?: { year?: number }) => {
     setLoading(true)
     await safeRequest(async () => {
       const q: Record<string, string | number> = {}
       if (opts?.year) q.year = opts.year
+      if ((opts as any)?.day) q.day = (opts as any).day
       const qs = new URLSearchParams(q as Record<string, string>).toString()
       const path = `/admin/stats${qs ? `?${qs}` : ''}`
       const res = await api.get(path) as any
@@ -37,7 +45,11 @@ export const BarChartCard = ({ title, data: initialData, initialYear }: BarChart
   }
 
   useEffect(() => {
-    if (!initialData) load({ year })
+    if (!initialData) {
+      const opts: any = { year }
+      if (initialWindow === 'day' && initialDay) opts.day = initialDay
+      load(opts)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -55,7 +67,11 @@ export const BarChartCard = ({ title, data: initialData, initialYear }: BarChart
               return <option key={y} value={y}>{y}</option>
             })}
           </select>
-          <button disabled={loading} onClick={() => load({ year })} className="text-xs ml-2 px-2 py-1 bg-primary text-white rounded">Áp dụng</button>
+          <button disabled={loading} onClick={() => {
+            const opts: any = { year }
+            if (initialWindow === 'day' && initialDay) opts.day = initialDay
+            load(opts)
+          }} className="text-xs ml-2 px-2 py-1 bg-primary text-white rounded">Áp dụng</button>
         </div>
       </div>
       <div className="h-56">

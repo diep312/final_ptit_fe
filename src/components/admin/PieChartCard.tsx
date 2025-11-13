@@ -14,9 +14,11 @@ interface PieChartCardProps {
   initialYear?: number;
   initialMonth?: number;
   initialLimit?: number;
+  initialWindow?: 'day' | 'month' | 'year';
+  initialDay?: string; // YYYY-MM-DD
 }
 
-export const PieChartCard = ({ title, data: initialData, initialYear, initialMonth, initialLimit = 3 }: PieChartCardProps) => {
+export const PieChartCard = ({ title, data: initialData, initialYear, initialMonth, initialLimit = 3, initialWindow, initialDay }: PieChartCardProps) => {
   const { api, safeRequest } = useApi()
   const now = new Date()
   const [year, setYear] = useState<number>(initialYear ?? now.getFullYear())
@@ -25,13 +27,19 @@ export const PieChartCard = ({ title, data: initialData, initialYear, initialMon
   const [data, setData] = useState<PieChartData[]>(initialData ?? [])
   const [loading, setLoading] = useState(false)
 
-  const load = async (opts?: { year?: number; month?: number; limit?: number }) => {
+  // Sync with parent-provided data updates (so dashboard-level fetch populates card)
+  useEffect(() => {
+    if (initialData) setData(initialData)
+  }, [initialData])
+
+  const load = async (opts?: { year?: number; month?: number; limit?: number; day?: string }) => {
     setLoading(true)
     await safeRequest(async () => {
       const q: Record<string, string | number> = {}
       if (opts?.year) q.year = opts.year
       if (opts?.month) q.month = opts.month
       if (opts?.limit) q.limit = opts.limit
+      if (opts?.day) q.day = opts.day
       const qs = new URLSearchParams(q as Record<string, string>).toString()
       const path = `/admin/stats${qs ? `?${qs}` : ''}`
       const res = await api.get(path) as any
@@ -45,7 +53,7 @@ export const PieChartCard = ({ title, data: initialData, initialYear, initialMon
 
   useEffect(() => {
     // if no initialData provided, fetch defaults
-    if (!initialData) load({ year, month, limit })
+    if (!initialData) load({ year, month, limit, day: initialDay })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -70,7 +78,11 @@ export const PieChartCard = ({ title, data: initialData, initialYear, initialMon
             })}
           </select>
           <input type="number" min={1} max={20} value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="text-xs w-14 p-1 rounded border" />
-          <button disabled={loading} onClick={() => load({ year, month, limit })} className="text-xs ml-2 px-2 py-1 bg-primary text-white rounded">Áp dụng</button>
+          <button disabled={loading} onClick={() => {
+            const opts: any = { year, month, limit }
+            if (initialWindow === 'day' && initialDay) opts.day = initialDay
+            load(opts)
+          }} className="text-xs ml-2 px-2 py-1 bg-primary text-white rounded">Áp dụng</button>
         </div>
       </div>
 

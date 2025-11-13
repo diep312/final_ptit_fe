@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import { QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useApi } from "@/hooks/use-api";
+import { toast } from "@/hooks/use-toast";
 
 const INACTIVITY_TIMEOUT = 3 * 60 * 1000; // 3 minutes in milliseconds
 
@@ -19,6 +21,7 @@ const CheckIn = () => {
 
   // Conference data - in real app, fetch from API using id
   const conferenceTitle = "Hội nghị Công nghệ Số Việt Nam 2025";
+  const { api, safeRequest } = useApi();
 
   const resetInactivityTimer = () => {
     lastActivityRef.current = Date.now();
@@ -123,36 +126,65 @@ const CheckIn = () => {
 
   const handleQRCodeScanned = async (qrCode: string) => {
     console.log("QR Code scanned:", qrCode);
-    
+
     // Reset inactivity timer when QR code is scanned
     resetInactivityTimer();
-    
+
     // Stop scanning temporarily to process the QR code
     await stopScanning();
-    
+
     try {
-      // TODO: Process the QR code with the backend API
-      // Example:
-      // const response = await fetch(`/api/conferences/${id}/check-in`, {
-      //   method: "POST",
-      //   body: JSON.stringify({ qrCode }),
-      //   headers: { "Content-Type": "application/json" },
-      // });
-      // const result = await response.json();
-      
-      // For now, just log and restart scanning after a brief pause
-      alert(`QR Code scanned: ${qrCode}`);
-      
-      // Restart scanning after processing
-      setTimeout(() => {
-        startScanning();
-      }, 1000);
+      // Extract registration id from scanned content
+      const scanned = (qrCode || "").trim();
+
+      const extractRegistrationId = (text: string) => {
+        if (!text) return null;
+        // UUID v4 pattern
+        const uuid = text.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/);
+        if (uuid) return uuid[0];
+        // Mongo ObjectId (24 hex)
+        const objId = text.match(/[0-9a-fA-F]{24}/);
+        if (objId) return objId[0];
+        // If it's a URL, use last path segment
+        try {
+          const u = new URL(text);
+          const parts = u.pathname.split('/').filter(Boolean);
+          if (parts.length) return parts[parts.length - 1];
+        } catch (e) {
+          // not a url
+        }
+        // Fallback: if the scanned string is short-ish, treat it as an id
+        if (text.length > 3 && text.length < 100) return text;
+        return null;
+      };
+
+  const registrationId = extractRegistrationId(scanned);
+      if (!registrationId) {
+        toast({ title: 'QR không hợp lệ', description: 'Không tìm thấy mã đăng ký trong QR.' });
+        setTimeout(() => startScanning(), 1000);
+        return;
+      }
+
+      // Call organizer check-in endpoint
+      const payload = { event_id: id, registration_id: registrationId };
+      const res = await safeRequest(() => api.post('/organizer/checkins', payload));
+
+      if (!res) {
+        // safeRequest already shows error via feedback provider. Restart scanning.
+        setTimeout(() => startScanning(), 1000);
+        return;
+      }
+
+      const msg = (res as any)?.message ?? 'Check-in thành công.';
+      toast({ title: 'Check-in', description: String(msg) });
+
+      // Restart scanning after a short pause so operator can see feedback
+      setTimeout(() => startScanning(), 1000);
     } catch (err) {
       console.error("Error processing QR code:", err);
+      toast({ title: 'Lỗi', description: (err as Error)?.message ?? 'Lỗi khi xử lý QR' });
       // Restart scanning even if there's an error
-      setTimeout(() => {
-        startScanning();
-      }, 1000);
+      setTimeout(() => startScanning(), 1000);
     }
   };
 
@@ -201,10 +233,11 @@ const CheckIn = () => {
   return (
     <div className="h-screen bg-gray-100 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center gap-3">
-          <span className="font-heading text-3xl font-bold text-gray-800">Conferdent</span>
-        </div>
+      <div className="border-b border-gray-200 px-6 py-4 flex gap-6 items-center">
+          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+            <img src="/logo.png" alt="Logo" className="w-full h-full object-cover"/>
+          </div>
+          <h1 className='font-heading font-bold text-3xl text-foreground'>Conferdent</h1>
       </div>
 
       <div className="flex-1 flex items-center justify-center p-4 md:p-8 overflow-hidden">
@@ -282,26 +315,6 @@ const CheckIn = () => {
               </div>
 
               {/* Overlay with corner indicators */}
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-20">
-                <div className="relative w-3/4 h-3/4 max-w-xs max-h-xs">
-                  {/* Top-left corner */}
-                  <div className="absolute top-0 left-0 w-12 h-12 md:w-16 md:h-16">
-                    <div className="absolute top-0 left-0 w-6 h-6 md:w-8 md:h-8 border-t-4 border-l-4 border-yellow-400" />
-                  </div>
-                  {/* Top-right corner */}
-                  <div className="absolute top-0 right-0 w-12 h-12 md:w-16 md:h-16">
-                    <div className="absolute top-0 right-0 w-6 h-6 md:w-8 md:h-8 border-t-4 border-r-4 border-yellow-400" />
-                  </div>
-                  {/* Bottom-left corner */}
-                  <div className="absolute bottom-0 left-0 w-12 h-12 md:w-16 md:h-16">
-                    <div className="absolute bottom-0 left-0 w-6 h-6 md:w-8 md:h-8 border-b-4 border-l-4 border-yellow-400" />
-                  </div>
-                  {/* Bottom-right corner */}
-                  <div className="absolute bottom-0 right-0 w-12 h-12 md:w-16 md:h-16">
-                    <div className="absolute bottom-0 right-0 w-6 h-6 md:w-8 md:h-8 border-b-4 border-r-4 border-yellow-400" />
-                  </div>
-                </div>
-              </div>
             </div>
 
             {error && (
