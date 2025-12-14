@@ -15,6 +15,7 @@ interface LoginResponse {
     access_token: string;
     expire_in: number;
     auth_type: string;
+    user_type?: string; // 'system_user' for admin/staff, 'organizer' for organizers
   };
 }
 
@@ -38,7 +39,7 @@ const Login = () => {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      if (userType === "admin") {
+      if (userType === "admin" || userType === "system_user") {
         navigate("/admin", { replace: true });
       } else if (userType === "organizer") {
         navigate("/dashboard", { replace: true });
@@ -49,84 +50,104 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    let loginSuccess = false;
-
-    try {
-      const adminLoginResult = await api.post<LoginResponse>("/admin/auth/login", {
+    // Try unified admin/system_user login first
+    const loginResult = await safeRequest<LoginResponse>(async () => {
+      return await api.post<LoginResponse>("/admin/auth/login", {
         email: formData.email,
         password: formData.password,
       });
+    });
 
-      if (adminLoginResult && adminLoginResult.data?.access_token) {
-        // Save token immediately so /me request can use it
-        const token = adminLoginResult.data.access_token;
-        if (token && typeof token === "string" && token.trim() !== "") {
-          localStorage.setItem("auth_token", token);
-          localStorage.setItem("user_type", "admin");
-        } else {
-          console.error("Invalid token received from login");
-          return;
-        }
-        
-        const adminProfileResponse = await safeRequest<{ status: number; success: boolean; message: string; data: UserProfile }>(async () => {
-          return await api.get<{ status: number; success: boolean; message: string; data: UserProfile }>("/admin/auth/me");
+    if (loginResult && loginResult.data?.access_token) {
+      const token = loginResult.data.access_token;
+      const userType = loginResult.data.user_type || "system_user"; // Default to system_user for admin endpoint
+
+      if (token && typeof token === "string" && token.trim() !== "") {
+        localStorage.setItem("auth_token", token);
+        // Map user_type from backend to frontend type
+        const frontendUserType =
+          userType === "system_user" ? "admin" : "organizer";
+        localStorage.setItem("user_type", frontendUserType);
+
+        // Fetch user profile
+        const profileResponse = await safeRequest<{
+          status: number;
+          success: boolean;
+          message: string;
+          data: UserProfile;
+        }>(async () => {
+          return await api.get<{
+            status: number;
+            success: boolean;
+            message: string;
+            data: UserProfile;
+          }>("/admin/auth/me");
         });
 
-        if (adminProfileResponse) {
-          // Extract profile from response (handle both wrapped and unwrapped formats)
-          const adminProfile: UserProfile = (adminProfileResponse as any)?.data || adminProfileResponse;
-          // Save to global auth context
-          login(token, adminProfile, "admin");
-          navigate("/admin");
-          loginSuccess = true;
+        if (profileResponse) {
+          const profile: UserProfile =
+            (profileResponse as any)?.data || profileResponse;
+          login(token, profile, frontendUserType as "admin" | "organizer");
+
+          // Redirect based on user type
+          if (frontendUserType === "admin") {
+            navigate("/admin");
+          } else {
+            navigate("/dashboard");
+          }
           return;
         }
+      } else {
+        console.error("Invalid token received from login");
       }
-    } catch (error) {
-      // Admin login failed, try organizer
     }
 
-    if (!loginSuccess) {
-      const organizerLoginResult = await safeRequest<LoginResponse>(async () => {
-        return await api.post<LoginResponse>("/organizer/auth/login", {
-          email: formData.email,
-          password: formData.password,
-        });
+    // If admin login failed, try organizer login (fallback for backward compatibility)
+    const organizerLoginResult = await safeRequest<LoginResponse>(async () => {
+      return await api.post<LoginResponse>("/organizer/auth/login", {
+        email: formData.email,
+        password: formData.password,
       });
+    });
 
-      if (organizerLoginResult && organizerLoginResult.data?.access_token) {
-        // Save token immediately so /me request can use it
-        const token = organizerLoginResult.data.access_token;
-        if (token && typeof token === "string" && token.trim() !== "") {
-          localStorage.setItem("auth_token", token);
-          localStorage.setItem("user_type", "organizer");
-        } else {
-          console.error("Invalid token received from login");
-          return;
-        }
-        
-        const organizerProfileResponse = await safeRequest<{ status: number; success: boolean; message: string; data: UserProfile }>(async () => {
-          return await api.get<{ status: number; success: boolean; message: string; data: UserProfile }>("/organizer/auth/me");
+    if (organizerLoginResult && organizerLoginResult.data?.access_token) {
+      const token = organizerLoginResult.data.access_token;
+      if (token && typeof token === "string" && token.trim() !== "") {
+        localStorage.setItem("auth_token", token);
+        localStorage.setItem("user_type", "organizer");
+
+        const organizerProfileResponse = await safeRequest<{
+          status: number;
+          success: boolean;
+          message: string;
+          data: UserProfile;
+        }>(async () => {
+          return await api.get<{
+            status: number;
+            success: boolean;
+            message: string;
+            data: UserProfile;
+          }>("/organizer/auth/me");
         });
 
         if (organizerProfileResponse) {
-          // Extract profile from response (handle both wrapped and unwrapped formats)
-          const organizerProfile: UserProfile = (organizerProfileResponse as any)?.data || organizerProfileResponse;
+          const organizerProfile: UserProfile =
+            (organizerProfileResponse as any)?.data || organizerProfileResponse;
           login(token, organizerProfile, "organizer");
           navigate("/dashboard");
-          loginSuccess = true;
         }
       }
     }
-
-    // If both logins failed, safeRequest will show the error message
   };
 
   return (
     <div className="min-h-screen bg-background flex">
       {/* Left Side - Image */}
-     <div className="hidden lg:flex lg:w-1/2 relative self-center overflow-hidden mx-10">
-        <div className="relative w-full" style={{ aspectRatio: '1 / 1', height: '80vh' }}>
+      <div className="hidden lg:flex lg:w-1/2 relative self-center overflow-hidden mx-10">
+        <div
+          className="relative w-full"
+          style={{ aspectRatio: "1 / 1", height: "80vh" }}
+        >
           <img
             src={authGradient}
             alt="Abstract gradient background"
@@ -138,7 +159,8 @@ const Login = () => {
                 Tiếp tục nơi mọi kết nối đang diễn ra.
               </h1>
               <p className="text-base text-white/90 pt-9">
-                Quản lý sự kiện, gặp người tham dự và tạo ra trải nghiệm khó quên với tất cả ở cùng tầm tay.
+                Quản lý sự kiện, gặp người tham dự và tạo ra trải nghiệm khó
+                quên với tất cả ở cùng tầm tay.
               </p>
             </div>
           </div>
@@ -158,7 +180,9 @@ const Login = () => {
               type="email"
               placeholder="Nhập email"
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
               required
             />
 
@@ -168,7 +192,9 @@ const Login = () => {
                 type={showPassword ? "text" : "password"}
                 placeholder="Nhập mật khẩu"
                 value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
                 required
               />
               <button
@@ -176,7 +202,11 @@ const Login = () => {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-5 top-12 text-muted-foreground hover:text-foreground transition-colors"
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
               </button>
             </div>
 
@@ -202,9 +232,12 @@ const Login = () => {
         </div>
       </div>
 
-
       <div className="absolute w-15 h- bg-primary rounded-lg flex items-center justify-center right-10 bottom-10">
-          <img src="/logo.png" alt="Logo" className="w-full h-full object-cover"/>
+        <img
+          src="/logo.png"
+          alt="Logo"
+          className="w-full h-full object-cover"
+        />
       </div>
     </div>
   );

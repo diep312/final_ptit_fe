@@ -19,6 +19,9 @@ import CheckIn from "./pages/CheckIn";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminConferences from "./pages/AdminConferences";
 import AdminUsers from "./pages/AdminUsers";
+import AdminSystemUsers from "./pages/AdminSystemUsers";
+import AdminRoles from "./pages/AdminRoles";
+import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
 
@@ -33,7 +36,7 @@ const App = () => (
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
             {/* <Route path="/register" element={<Register />} /> */}
-            
+
             {/* Organizer Routes */}
             <Route
               path="/dashboard"
@@ -138,6 +141,30 @@ const App = () => (
               element={
                 <ProtectedRoute requiredUserType="admin">
                   <AdminUsers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/system-users"
+              element={
+                <ProtectedRoute requiredUserType="admin">
+                  <AdminSystemUsers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/roles"
+              element={
+                <ProtectedRoute requiredUserType="admin">
+                  <AdminRoles />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute requiredUserType="admin">
+                  <Profile />
                 </ProtectedRoute>
               }
             />

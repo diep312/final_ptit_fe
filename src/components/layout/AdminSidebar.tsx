@@ -1,4 +1,13 @@
-import { Home, Calendar, FileText, Users, LogOut } from "lucide-react";
+import {
+  Home,
+  Calendar,
+  FileText,
+  Users,
+  LogOut,
+  UserCog,
+  Shield,
+  User,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -7,6 +16,9 @@ const navItems = [
   { label: "Quản lý hội nghị", path: "/admin/conferences", icon: Calendar },
   // { label: "Quản lý yêu cầu", path: "/admin/requests", icon: FileText },
   { label: "Quản lý người dùng", path: "/admin/users", icon: Users },
+  { label: "Người dùng hệ thống", path: "/admin/system-users", icon: UserCog },
+  { label: "Vai trò", path: "/admin/roles", icon: Shield },
+  { label: "Hồ sơ của tôi", path: "/profile", icon: User },
 ];
 
 export const AdminSidebar = () => {
@@ -19,7 +31,9 @@ export const AdminSidebar = () => {
     <aside className="w-64 bg-card border-r h-screen sticky top-0 flex flex-col">
       <div className="p-6">
         <h1 className="text-3xl font-bold font-heading">Conferdent</h1>
-        <p className="text-sm text-muted-foreground font-heading">Admin Console</p>
+        <p className="text-sm text-muted-foreground font-heading">
+          Admin Console
+        </p>
       </div>
 
       <nav className="px-4 space-y-4 overflow-y-auto">

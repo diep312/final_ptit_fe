@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  requiredUserType?: "admin" | "organizer";
+  requiredUserType?: "admin" | "organizer" | "system_user";
   redirectTo?: string;
 }
 
@@ -30,16 +30,28 @@ export function ProtectedRoute({
     return <Navigate to={redirectTo} replace />;
   }
 
-  if (requiredUserType && userType !== requiredUserType) {
-    // Redirect to appropriate dashboard based on user type
-    if (userType === "admin") {
-      return <Navigate to="/admin" replace />;
-    } else if (userType === "organizer") {
-      return <Navigate to="/dashboard" replace />;
+  if (requiredUserType) {
+    // Allow both 'admin' and 'system_user' to access admin routes
+    const isAdminRoute =
+      requiredUserType === "admin" || requiredUserType === "system_user";
+    const isAdminUser = userType === "admin" || userType === "system_user";
+
+    if (isAdminRoute && !isAdminUser) {
+      // Non-admin trying to access admin route
+      if (userType === "organizer") {
+        return <Navigate to="/dashboard" replace />;
+      }
+      return <Navigate to={redirectTo} replace />;
     }
-    return <Navigate to={redirectTo} replace />;
+
+    if (requiredUserType === "organizer" && userType !== "organizer") {
+      // Non-organizer trying to access organizer route
+      if (isAdminUser) {
+        return <Navigate to="/admin" replace />;
+      }
+      return <Navigate to={redirectTo} replace />;
+    }
   }
 
   return <>{children}</>;
 }
-
