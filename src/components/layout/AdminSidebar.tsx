@@ -7,6 +7,7 @@ import {
   UserCog,
   Shield,
   User,
+  Bell,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,6 +19,7 @@ const navItems = [
   { label: "Quản lý người dùng", path: "/admin/users", icon: Users },
   { label: "Người dùng hệ thống", path: "/admin/system-users", icon: UserCog },
   { label: "Vai trò", path: "/admin/roles", icon: Shield },
+  { label: "Thông báo", path: "/admin/notifications", icon: Bell },
   { label: "Hồ sơ của tôi", path: "/profile", icon: User },
 ];
 

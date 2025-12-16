@@ -7,16 +7,15 @@ import { useAuth } from "@/contexts/AuthContext";
 export const Navigation = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
-  
+
   const handleLogout = async () => {
     await logout();
   };
 
-
   const navItems = [
     { label: "Trang chủ", path: "/dashboard", icon: Home },
-    // { label: "Cài đặt", path: "/conferences", icon: Settings },
-    { label: "Tạo hội nghị mới", path: "/create-conference", icon: Plus }
+    { label: "Thông báo", path: "/notifications", icon: Bell },
+    { label: "Tạo hội nghị mới", path: "/create-conference", icon: Plus },
   ];
 
   return (
@@ -27,11 +26,17 @@ export const Navigation = () => {
             {/* Logo */}
             <Link to="/dashboard" className="flex items-center gap-4">
               <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <img src="/logo.png" alt="Logo" className="w-full h-full object-cover"/>
+                <img
+                  src="/logo.png"
+                  alt="Logo"
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div className="flex flex-col">
-                <h1 className='font-heading font-bold text-3xl text-foreground'>Conferdent</h1>
-                <p className='font-heading text-sm'>Event Organiser</p>
+                <h1 className="font-heading font-bold text-3xl text-foreground">
+                  Conferdent
+                </h1>
+                <p className="font-heading text-sm">Event Organiser</p>
               </div>
             </Link>
 
@@ -59,12 +64,18 @@ export const Navigation = () => {
 
           {/* Right Section */}
           <div className="flex items-center gap-4">
-            <Button variant="secondary" size="icon" className="relative flex w-fit px-4">
-              <Bell className="w-5 h-5"/>
-              <p className="font-medium font-heading transition-colors text-base">Thông báo</p>
+            <Button
+              variant="secondary"
+              size="icon"
+              className="relative flex w-fit px-4"
+            >
+              <Bell className="w-5 h-5" />
+              <p className="font-medium font-heading transition-colors text-base">
+                Thông báo
+              </p>
               <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full"></span>
             </Button>
-            
+
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
                 <span className="text-primary-foreground text-sm font-medium">
@@ -72,8 +83,12 @@ export const Navigation = () => {
                 </span>
               </div>
               <div className="hidden lg:block text-sm">
-                <div className="font-medium text-foreground">{user?.name || "User"}</div>
-                <div className="text-muted-foreground text-xs">{user?.email || ""}</div>
+                <div className="font-medium text-foreground">
+                  {user?.name || "User"}
+                </div>
+                <div className="text-muted-foreground text-xs">
+                  {user?.email || ""}
+                </div>
               </div>
             </div>
           </div>

@@ -8,6 +8,10 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import OrganizerNotifications from "./pages/OrganizerNotifications";
+import CreateOrganizerNotification from "./pages/CreateOrganizerNotification";
+import EditOrganizerNotification from "./pages/EditOrganizerNotification";
+import OrganizerNotificationStats from "./pages/OrganizerNotificationStats";
 import CreateConference from "./pages/CreateConference";
 import ConferenceDetail from "./pages/ConferenceDetail";
 import NotFound from "./pages/NotFound";
@@ -21,6 +25,10 @@ import AdminConferences from "./pages/AdminConferences";
 import AdminUsers from "./pages/AdminUsers";
 import AdminSystemUsers from "./pages/AdminSystemUsers";
 import AdminRoles from "./pages/AdminRoles";
+import AdminNotifications from "./pages/AdminNotifications";
+import CreateNotification from "./pages/CreateNotification";
+import EditNotification from "./pages/EditNotification";
+import NotificationStats from "./pages/NotificationStats";
 import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
@@ -43,6 +51,38 @@ const App = () => (
               element={
                 <ProtectedRoute requiredUserType="organizer">
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/notifications"
+              element={
+                <ProtectedRoute requiredUserType="organizer">
+                  <OrganizerNotifications />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/notifications/create"
+              element={
+                <ProtectedRoute requiredUserType="organizer">
+                  <CreateOrganizerNotification />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/notifications/:id/edit"
+              element={
+                <ProtectedRoute requiredUserType="organizer">
+                  <EditOrganizerNotification />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/notifications/:id/stats"
+              element={
+                <ProtectedRoute requiredUserType="organizer">
+                  <OrganizerNotificationStats />
                 </ProtectedRoute>
               }
             />
@@ -157,6 +197,38 @@ const App = () => (
               element={
                 <ProtectedRoute requiredUserType="admin">
                   <AdminRoles />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/notifications"
+              element={
+                <ProtectedRoute requiredUserType="admin">
+                  <AdminNotifications />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/notifications/create"
+              element={
+                <ProtectedRoute requiredUserType="admin">
+                  <CreateNotification />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/notifications/:id/edit"
+              element={
+                <ProtectedRoute requiredUserType="admin">
+                  <EditNotification />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/notifications/:id/stats"
+              element={
+                <ProtectedRoute requiredUserType="admin">
+                  <NotificationStats />
                 </ProtectedRoute>
               }
             />
