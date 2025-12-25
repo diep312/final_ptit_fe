@@ -1,4 +1,4 @@
-import { LayoutDashboard, Calendar, FileText, Edit, ClipboardCheck } from "lucide-react";
+import { LayoutDashboard, Calendar, FileText, Edit, ClipboardCheck, FormInput } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +32,11 @@ export const ConferenceSidebar: React.FC<ConferenceSidebarProps> = ({ title }) =
       label: "Danh sách đăng ký",
       to: `/conference/${id}/registrations`,
       icon: FileText,
+    },
+    {
+      label: "Form đăng ký",
+      to: `/conference/${id}/form`,
+      icon: FormInput,
     },
     {
       label: "Chỉnh sửa",

@@ -71,15 +71,11 @@ const RegistrationList = () => {
     if (!id) return;
     setLoading(true);
     safeRequest(async () => {
-      const resAny: any = await api.get(`/organizer/events/${id}/registrations`);
-      if (!resAny) return;
-
-      const res: any = resAny;
-
-      // derive fields: prefer provided field metadata, otherwise infer from responses
+      // Get form fields
+      const formRes: any = await api.get(`/organizer/events/forms/event/${id}`);
       let mappedFields: FormField[] = [];
-      if (Array.isArray(res.fields) && res.fields.length) {
-        mappedFields = res.fields.map((f: any) => ({
+      if (formRes && Array.isArray(formRes.fields)) {
+        mappedFields = formRes.fields.map((f: any) => ({
           id: f._id,
           label: f.field_label || f._id,
           type: ((): FormFieldType => {
@@ -88,16 +84,13 @@ const RegistrationList = () => {
           })(),
           options: f.field_options || []
         }));
-      } else if (Array.isArray(res.registrations) && res.registrations.length) {
-        const fieldSet = new Set<string>();
-        for (const r of res.registrations) {
-          const keys = r.responses ? Object.keys(r.responses) : [];
-          for (const k of keys) fieldSet.add(k);
-        }
-        mappedFields = Array.from(fieldSet).map(id => ({ id, label: id, type: 'text' }));
       }
-
       setFields(mappedFields);
+
+      // Get registrations
+      const resAny: any = await api.get(`/organizer/events/${id}/registrations`);
+      if (!resAny) return;
+      const res: any = resAny;
       setRegistrations(res.registrations || []);
     }).finally(() => setLoading(false));
   }, [id]);
@@ -137,6 +130,13 @@ const RegistrationList = () => {
         </div>
       );
     }
+    if (field.type === 'date') {
+      try {
+        return <span className="text-sm">{new Date(value).toLocaleDateString()}</span>;
+      } catch {
+        return <span className="text-sm">{String(value)}</span>;
+      }
+    }
     return <span className="text-sm">{String(value)}</span>;
   };
 
@@ -147,13 +147,13 @@ const RegistrationList = () => {
       <div className="px-6 py-6 min-w-0">
         <div className="space-y-4 min-w-0">
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => {}}>
+            {/* <Button variant="outline" onClick={() => {}}>
               <Filter className="h-4 w-4 mr-2" /> Lọc
-            </Button>
-            <Input placeholder="Nhập tên cần tìm kiếm..." value={searchQuery} onChange={(e:any) => { setSearchQuery(e.target.value); setCurrentPage(1); }} className="flex-1 max-w-md" />
+            </Button> */}
+            <Input className="mx-auto" placeholder="Nhập tên cần tìm kiếm..." value={searchQuery} onChange={(e:any) => { setSearchQuery(e.target.value); setCurrentPage(1); }} className="flex-1 max-w-md" />
           </div>
 
-          <div className="rounded-lg border bg-white min-w-0 overflow-y-auto h-[420px] mx-auto" style={{ maxWidth: 'calc(100vw - 200px)' }}>
+          <div className="rounded-lg border bg-white min-w-0 overflow-y-auto h-[580px] mx-auto" style={{ maxWidth: 'calc(100vw - 200px)' }}>
             {/* container scrolls horizontally and vertically; keeps fixed card size
                 maxWidth subtracts sidebar+gutter so the card doesn't span the full viewport */}
             <div style={{ minWidth: tableMinWidth }} className="min-w-0 inline-block" >
@@ -161,16 +161,31 @@ const RegistrationList = () => {
                 <TableHeader>
                   <TableRow className="bg-muted">
                     <TableHead className="min-w-[60px] font-medium">STT</TableHead>
-                    <TableHead className="min-w-[180px] font-medium">Tên</TableHead>
-                    <TableHead className="min-w-[220px] font-medium">Email</TableHead>
-                    {showColumns.avatar && <TableHead className="min-w-[80px] font-medium">Avatar</TableHead>}
-                    {showColumns.phone && <TableHead className="min-w-[140px] font-medium">SĐT</TableHead>}
-                    {showColumns.dob && <TableHead className="min-w-[120px] font-medium">Ngày sinh</TableHead>}
-                    {showColumns.gender && <TableHead className="min-w-[120px] font-medium">Giới tính</TableHead>}
-                    {showColumns.address && <TableHead className="min-w-[220px] font-medium">Địa chỉ</TableHead>}
-                    {showColumns.bio && <TableHead className="min-w-[200px] font-medium">Ghi chú</TableHead>}
-                    {showColumns.created_at && <TableHead className="min-w-[180px] font-medium">Ngày đăng ký</TableHead>}
-                    {fields.map(f => <TableHead key={f.id} className="min-w-[150px] font-medium">{f.label}</TableHead>)}
+                    {fields.map(f => {
+                      // Map field type to min-width
+                      const typeWidthMap: Record<string, string> = {
+                        NUMBER: 'min-w-[48px]',
+                        CHECKBOX: 'min-w-[56px]',
+                        TIME_MINUTE: 'min-w-[56px]',
+                        FILE: 'min-w-[64px]',
+                        PHONE: 'min-w-[72px]',
+                        EMAIL: 'min-w-[88px]',
+                        RADIO: 'min-w-[88px]',
+                        DATE: 'min-w-[88px]',
+                        TEXT: 'min-w-[64px]',
+                        TEXTAREA: 'min-w-[120px]',
+                        multipleChoice: 'min-w-[88px]',
+                        text: 'min-w-[64px]',
+                        textarea: 'min-w-[120px]',
+                        number: 'min-w-[48px]',
+                        email: 'min-w-[88px]',
+                        date: 'min-w-[88px]',
+                      };
+                      const minWidth = typeWidthMap[f.type?.toUpperCase?.() || f.type] || 'min-w-[150px]';
+                      return (
+                        <TableHead key={f.id} className={`${minWidth} font-medium`}>{f.label}</TableHead>
+                      );
+                    })}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -178,26 +193,36 @@ const RegistrationList = () => {
                     paginated.map((reg: any, idx: number) => (
                       <TableRow key={reg.registration_id || idx}>
                         <TableCell className="font-medium">{startIndex + idx + 1}</TableCell>
-                        <TableCell>{reg.registration?.full_name || '-'}</TableCell>
-                        <TableCell>{reg.registration?.email || '-'}</TableCell>
-                        {showColumns.avatar && (
-                          <TableCell>{reg.registration?.avatar_url ? <img src={reg.registration.avatar_url} alt="avatar" className="h-8 w-8 rounded-full object-cover" /> : '-'}</TableCell>
-                        )}
-                        {showColumns.phone && <TableCell>{reg.registration?.phone || '-'}</TableCell>}
-                        {showColumns.dob && <TableCell>{reg.registration?.dob ? new Date(reg.registration.dob).toLocaleDateString() : '-'}</TableCell>}
-                        {showColumns.gender && <TableCell>{reg.registration?.gender || '-'}</TableCell>}
-                        {showColumns.address && <TableCell>{reg.registration?.address || '-'}</TableCell>}
-                        {showColumns.bio && <TableCell>{reg.registration?.bio || '-'}</TableCell>}
-                        {showColumns.created_at && <TableCell>{reg.registration?.created_at ? new Date(reg.registration.created_at).toLocaleString() : '-'}</TableCell>}
-                        {fields.map(f => (
-                          <TableCell key={f.id}>{renderFieldValue(f, reg.responses ? reg.responses[f.id] : undefined)}</TableCell>
-                        ))}
+                        {fields.map(f => {
+                          const typeWidthMap: Record<string, string> = {
+                            NUMBER: 'min-w-[48px]',
+                            CHECKBOX: 'min-w-[56px]',
+                            TIME_MINUTE: 'min-w-[56px]',
+                            FILE: 'min-w-[64px]',
+                            PHONE: 'min-w-[72px]',
+                            EMAIL: 'min-w-[88px]',
+                            RADIO: 'min-w-[88px]',
+                            DATE: 'min-w-[88px]',
+                            TEXT: 'min-w-[64px]',
+                            TEXTAREA: 'min-w-[120px]',
+                            multipleChoice: 'min-w-[88px]',
+                            text: 'min-w-[64px]',
+                            textarea: 'min-w-[120px]',
+                            number: 'min-w-[48px]',
+                            email: 'min-w-[88px]',
+                            date: 'min-w-[88px]',
+                          };
+                          const minWidth = typeWidthMap[f.type?.toUpperCase?.() || f.type] || 'min-w-[150px]';
+                          return (
+                            <TableCell key={f.id} className={minWidth}>{renderFieldValue(f, reg.responses ? reg.responses[f.id] : reg.registration ? reg.registration[f.id] : undefined)}</TableCell>
+                          );
+                        })}
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
                       <TableCell colSpan={totalCols} className="text-center text-muted-foreground">
-                        <div className="flex items-center justify-center py-12 min-h-[320px] w-full">Không có dữ liệu</div>
+                        <div className="flex items-center justify-center py-12 min-h-[580px] w-full">Không có dữ liệu</div>
                       </TableCell>
                     </TableRow>
                   )}

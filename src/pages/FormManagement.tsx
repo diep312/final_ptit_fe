@@ -33,27 +33,12 @@ const FormManagement = () => {
   const { api, safeRequest } = useApi()
 
   // Form state
+  const [formTitle, setFormTitle] = useState<string>("");
+  const [formDescription, setFormDescription] = useState<string>("");
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
-  const [isPublished, setIsPublished] = useState(true);
-  const [fields, setFields] = useState<FormField[]>([
-    {
-      id: "name",
-      label: "Họ và tên người tham gia",
-      type: "text",
-      required: true,
-      placeholder: "Điền thông tin tham gia tại đây...",
-      isDefault: true,
-    },
-    {
-      id: "email",
-      label: "Email liên hệ",
-      type: "email",
-      required: true,
-      placeholder: "Điền thông tin tham gia tại đây...",
-      isDefault: true,
-    },
-  ]);
+  const [isPublished, setIsPublished] = useState(false);
+  const [fields, setFields] = useState<FormField[]>([]);
 
   // Dialog state
   const [isAddFieldDialogOpen, setIsAddFieldDialogOpen] = useState(false);
@@ -68,12 +53,14 @@ const FormManagement = () => {
   // Mock form info (replace with API)
   const [formId, setFormId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [eventData, setEventData] = useState<any>(null)
+  const [statistics, setStatistics] = useState<{ registered: number }>({ registered: 0 });
 
   const formInfo = {
     displayStatus: isPublished ? "Đã xuất bản" : "Chưa xuất bản",
-    maxRegistrations: "100,000",
-    currentRegistrations: "100",
-    contactEmail: "hoinghi@gmail.com",
+    maxRegistrations: eventData?.data?.capacity ? String(eventData.data.capacity) : "N/A",
+    currentRegistrations: statistics.registered,
+    contactEmail: eventData?.organizer?.email || eventData?.contact_email || "N/A",
   };
 
   const fieldTypeLabels: Record<FieldType, string> = {
@@ -99,7 +86,11 @@ const FormManagement = () => {
 
   const handleFieldUpdate = (fieldId: string, updates: Partial<FormField>) => {
     setFields((prev) =>
-      prev.map((field) => (field.id === fieldId ? { ...field, ...updates } : field))
+      prev.map((field) => {
+        // Don't allow updating default fields except for label
+        if (field.isDefault && !updates.label) return field;
+        return field.id === fieldId ? { ...field, ...updates } : field;
+      })
     );
   };
 
@@ -193,10 +184,8 @@ const FormManagement = () => {
     setFields(newFields);
   };
 
-  const handlePublish = () => {
-    setIsPublished(true);
-    // Save form and publish via API
-    saveForm(true)
+  const handlePublish = async () => {
+    await saveForm(true);
   };
 
   const mapFieldToPayload = (f: FormField, position: number) => {
@@ -227,28 +216,77 @@ const FormManagement = () => {
   const saveForm = async (publish = false) => {
     if (!id) return
     const payload = {
-      event_id: id,
-      title: `Form đăng ký ${id}`,
-      description: '',
+      title: formTitle || `Form đăng ký ${id}`,
+      description: formDescription,
       is_public: publish || isPublished,
-      fields: fields.map((f, idx) => mapFieldToPayload(f, idx))
+      fields: fields.map((f, idx) => ({
+        _id: f.id,
+        ...mapFieldToPayload(f, idx)
+      }))
     }
 
     setLoading(true)
     await safeRequest(async () => {
       if (formId) {
-        // update
-        await api.put(`/organizer/events/forms/${formId}`, {
-          title: payload.title,
-          description: payload.description,
-          is_public: payload.is_public
-        })
-        // update fields: for simplicity, delete existing fields and recreate via createFormWithFields is not available;
-        // here we'll call create endpoint only when creating a new form. If updating fields is needed, call field endpoints.
+        // update form with fields
+        const updated: any = await api.put(`/organizer/events/forms/${formId}/with-fields`, payload)
+        if (updated) {
+          if (publish) setIsPublished(true);
+          // Reload fields to get updated IDs for new fields
+          const form: any = await api.get(`/organizer/events/forms/event/${id}`)
+          if (form && form.fields) {
+            const mapped = (form.fields || []).map((f: any, idx: number) => {
+              const TYPE_MAP: Record<string, any> = {
+                TEXT: 'text',
+                TEXTAREA: 'textarea',
+                RADIO: 'multipleChoice',
+                CHECKBOX: 'multipleChoice',
+                EMAIL: 'email',
+                NUMBER: 'number',
+                DATE: 'date'
+              }
+              return {
+                id: f._id || String(idx),
+                label: f.field_label,
+                type: TYPE_MAP[f.field_type] || 'text',
+                required: !!f.required,
+                options: f.field_options || [],
+                isDefault: !!f.is_primary_key
+              }
+            })
+            if (mapped.length > 0) setFields(mapped)
+          }
+        }
       } else {
-        const created = await api.post('/organizer/events/forms', payload)
+        // create form with fields
+        const created: any = await api.post('/organizer/events/forms', payload)
         if (created?.form && created.form._id) {
           setFormId(created.form._id)
+          if (publish) setIsPublished(true);
+          // Reload to get proper field IDs
+          const form: any = await api.get(`/organizer/events/forms/event/${id}`)
+          if (form && form.fields) {
+            const mapped = (form.fields || []).map((f: any, idx: number) => {
+              const TYPE_MAP: Record<string, any> = {
+                TEXT: 'text',
+                TEXTAREA: 'textarea',
+                RADIO: 'multipleChoice',
+                CHECKBOX: 'multipleChoice',
+                EMAIL: 'email',
+                NUMBER: 'number',
+                DATE: 'date'
+              }
+              return {
+                id: f._id || String(idx),
+                label: f.field_label,
+                type: TYPE_MAP[f.field_type] || 'text',
+                required: !!f.required,
+                options: f.field_options || [],
+                isDefault: !!f.is_primary_key
+              }
+            })
+            if (mapped.length > 0) setFields(mapped)
+          }
         }
       }
     })
@@ -258,10 +296,21 @@ const FormManagement = () => {
   useEffect(() => {
     // Load existing form by event id
     if (!id) return
-    safeRequest(async () => {
-      const form = await api.get(`/organizer/events/forms/event/${id}`)
+    
+    const loadData = async () => {
+      // Load event data
+      const event: any = await safeRequest(() => api.get(`/organizer/events/${id}`))
+      if (event) {
+        setEventData(event)
+      }
+
+
+      // Load form data
+      const form: any = await safeRequest(() => api.get(`/organizer/events/forms/event/${id}`))
       if (form) {
         setFormId(form._id)
+        setFormTitle(form.title || '')
+        setFormDescription(form.description || '')
         setIsPublished(!!form.is_public)
         // map fields from backend to local representation
         const mapped = (form.fields || []).map((f: any, idx: number) => {
@@ -284,13 +333,23 @@ const FormManagement = () => {
           }
         })
         if (mapped.length > 0) setFields(mapped)
+        // Only load registration statistics if form is public
+        if (form.is_public) {
+          const stRes: any = await safeRequest(() => api.get(`/organizer/events/${id}/statistics`));
+          const stData = (stRes as any)?.data ?? stRes ?? null;
+          if (stData) {
+            setStatistics({
+              registered: stData.registered ?? stData.totalRegistrations ?? 0,
+            });
+          }
+        } else {
+          setStatistics({ registered: 0 });
+        }
       }
-    })
-  }, [id])
+    }
 
-  const handleBack = () => {
-    navigate(`/conference/${id}/registrations`);
-  };
+    loadData()
+  }, [id])
 
   return (
     <ConferenceLayout sidebarTitle="Hội nghị Công nghệ Số Việt Nam 2025">
@@ -308,13 +367,34 @@ const FormManagement = () => {
                 </p>
               </div>
             </div>
-            <Button onClick={handlePublish}>
-              <Upload className="h-4 w-4 mr-2" />
-              Xuất bản
-            </Button>
           </div>
 
-          {/* Thumbnail Upload */}
+          {/* Form Title and Description */}
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="form-title">Tiêu đề form</Label>
+                <Input
+                  id="form-title"
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
+                  placeholder="Nhập tiêu đề form đăng ký..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="form-description">Mô tả form</Label>
+                <Textarea
+                  id="form-description"
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  placeholder="Nhập mô tả cho form đăng ký..."
+                  rows={3}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Thumbnail Upload
           <Card>
             <CardContent className="pt-6">
               <Label htmlFor="thumbnail" className="block mb-2">
@@ -354,7 +434,7 @@ const FormManagement = () => {
                 )}
               </div>
             </CardContent>
-          </Card>
+          </Card> */}
 
           {/* Form Fields */}
           <div className="space-y-4">
@@ -369,10 +449,16 @@ const FormManagement = () => {
                           <Input
                             value={field.label}
                             onChange={(e) => handleFieldUpdate(field.id, { label: e.target.value })}
-                            className="text-base font-medium border-none p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
+                            className="text-base font-heading border-0 border-b-2 border-border rounded-none h-auto bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 px-0"
                             placeholder="Nhập nhãn trường..."
+                            disabled={field.isDefault}
                           />
                           {field.required && <span className="text-red-500">*</span>}
+                          {field.isDefault && (
+                            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                              Trường mặc định
+                            </span>
+                          )}
                         </div>
 
                         {/* Input based on type */}
@@ -394,25 +480,37 @@ const FormManagement = () => {
                                   }
                                   placeholder="Tùy chọn"
                                   className="flex-1"
+                                  disabled={field.isDefault}
                                 />
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleRemoveOption(field.id, optIdx)}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
+                                {!field.isDefault && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleRemoveOption(field.id, optIdx)}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </div>
                             ))}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleAddOption(field.id)}
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Thêm tùy chọn
-                            </Button>
+                            {!field.isDefault && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleAddOption(field.id)}
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Thêm tùy chọn
+                              </Button>
+                            )}
                           </div>
+                        ) : field.type === "date" ? (
+                          <Input
+                            id={`field-${field.id}`}
+                            type="date"
+                            placeholder={field.placeholder}
+                            disabled
+                          />
                         ) : (
                           <Input
                             id={`field-${field.id}`}
@@ -432,6 +530,7 @@ const FormManagement = () => {
                             options: value === "multipleChoice" ? [] : undefined,
                           })
                         }
+                        disabled={field.isDefault}
                       >
                         <SelectTrigger className="w-48">
                           <SelectValue />
@@ -458,6 +557,7 @@ const FormManagement = () => {
                           onCheckedChange={(checked) =>
                             handleFieldUpdate(field.id, { required: checked })
                           }
+                          disabled={field.isDefault}
                         />
                       </div>
                       {!field.isDefault && (
@@ -514,13 +614,33 @@ const FormManagement = () => {
                   <Label className="text-sm text-muted-foreground">Số lượng đăng ký tối đa:</Label>
                   <p className="font-medium">{formInfo.maxRegistrations}</p>
                 </div>
-                <div>
-                  <Label className="text-sm text-muted-foreground">Số lượng đăng ký hiện tại:</Label>
-                  <p className="font-medium">{formInfo.currentRegistrations}</p>
-                </div>
-                <div>
+                {isPublished && (
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Số lượng đăng ký hiện tại:</Label>
+                    <p className="font-medium">{formInfo.currentRegistrations}</p>
+                  </div>
+                )}
+                {/* <div>
                   <Label className="text-sm text-muted-foreground">Email liên hệ:</Label>
                   <p className="font-medium">{formInfo.contactEmail}</p>
+                </div> */}
+                <div className="pt-4 space-y-2">
+                  <Button 
+                    variant="outline" 
+                    className="w-full" 
+                    onClick={() => saveForm(false)} 
+                    disabled={loading}
+                  >
+                    Lưu nháp
+                  </Button>
+                  <Button 
+                    className="w-full" 
+                    onClick={handlePublish} 
+                    disabled={loading}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Xuất bản
+                  </Button>
                 </div>
               </CardContent>
             </Card>

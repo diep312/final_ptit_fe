@@ -1,9 +1,16 @@
 import { useState, useEffect } from "react";
-import { Upload, UserPlus, MoreVertical } from "lucide-react";
+import { Upload, UserPlus, MoreVertical, Eye, EyeOff } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ConferenceLayout } from "@/components/layout/ConferenceLayout";
+import { ConferenceTopBar } from "@/components/conference/ConferenceTopBar";
 import { Input } from "@/components/common/Input";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultiSelectTag } from "@/components/common/MultiSelectTag";
 import { Textarea } from "@/components/ui/textarea";
@@ -69,8 +76,74 @@ const EditConference = () => {
     lng: "",
     capacity: "",
     tags: [] as string[],
+    status: "waiting" as string,
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Validation functions
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    // Name validation
+    if (!formData.name.trim()) {
+      newErrors.name = "Tên sự kiện là bắt buộc";
+    } else if (formData.name.length > 100) {
+      newErrors.name = "Tên sự kiện không được vượt quá 100 ký tự";
+    }
+
+    // Description validation
+    if (formData.description && formData.description.length > 600) {
+      newErrors.description = "Mô tả không được vượt quá 600 ký tự";
+    }
+
+    // Capacity validation
+    if (!formData.capacity) {
+      newErrors.capacity = "Số lượng người tham gia là bắt buộc";
+    } else if (parseInt(formData.capacity) < 1) {
+      newErrors.capacity = "Số lượng người tham gia phải lớn hơn 0";
+    }
+
+    // Time validation
+    if (!formData.startDate || !formData.startTime) {
+      newErrors.startTime = "Thời gian bắt đầu là bắt buộc";
+    } else {
+      const startDateTime = new Date(`${formData.startDate}T${formData.startTime}`);
+      const now = new Date();
+      
+      if (startDateTime < now) {
+        newErrors.startTime = "Thời gian bắt đầu không được nhỏ hơn thời gian hiện tại";
+      }
+    }
+
+    if (!formData.endDate || !formData.endTime) {
+      newErrors.endTime = "Thời gian kết thúc là bắt buộc";
+    } else if (formData.startDate && formData.startTime) {
+      const startDateTime = new Date(`${formData.startDate}T${formData.startTime}`);
+      const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
+      
+      if (endDateTime <= startDateTime) {
+        newErrors.endTime = "Thời gian kết thúc phải sau thời gian bắt đầu";
+      } else {
+        const durationMinutes = (endDateTime.getTime() - startDateTime.getTime()) / (1000 * 60);
+        if (durationMinutes < 5) {
+          newErrors.endTime = "Sự kiện phải kéo dài ít nhất 5 phút";
+        }
+      }
+    }
+
+    // Location validation
+    if (!formData.location.trim()) {
+      newErrors.location = "Địa điểm tổ chức là bắt buộc";
+    }
+
+    if (!formData.lat || !formData.lng) {
+      newErrors.location = "Vui lòng chọn vị trí trên bản đồ";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   // Load event data
   useEffect(() => {
@@ -98,6 +171,7 @@ const EditConference = () => {
             lng: event.lng?.toString() || "",
             capacity: event.capacity?.toString() || "",
             tags: event.tags || [],
+            status: event.status || "waiting",
           });
 
           if (event.thumbnail) {
@@ -144,6 +218,10 @@ const EditConference = () => {
         setThumbnailPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+      // Clear thumbnail error when file is uploaded
+      if (errors.thumbnail) {
+        setErrors({ ...errors, thumbnail: "" });
+      }
     }
   };
 
@@ -360,6 +438,11 @@ const EditConference = () => {
     e.preventDefault();
     if (!id) return;
     
+    // Validate form before submission
+    if (!validateForm()) {
+      return;
+    }
+    
     setIsSubmitting(true);
 
     try {
@@ -461,6 +544,19 @@ const EditConference = () => {
     }
   };
 
+  const handleStatusChange = async (newStatus: "published" | "waiting") => {
+    if (!id) return;
+
+    const published = newStatus === "published";
+    const result = await safeRequest(() =>
+      api.patch(`/organizer/events/${id}/publish`, { published })
+    );
+
+    if (result) {
+      setFormData({ ...formData, status: newStatus });
+    }
+  };
+
   const handleDelete = async () => {
     if (!id) return;
     if (!confirm("Bạn có chắc chắn muốn xóa sự kiện này?")) {
@@ -485,110 +581,216 @@ const EditConference = () => {
 
   return (
     <ConferenceLayout showSidebar={true}>
-      <div className="max-w-6xl mx-auto py-6 px-6">
-        <h1 className="font-heading text-4xl font-bold mb-8">Chỉnh sửa sự kiện</h1>
-
+      <ConferenceTopBar
+        title="Chỉnh sửa sự kiện"
+        actions={
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  {formData.status === "published" ? (
+                    <>
+                      <Eye className="w-4 h-4 mr-2" />
+                      Công khai
+                    </>
+                  ) : (
+                    <>
+                      <EyeOff className="w-4 h-4 mr-2" />
+                      Riêng tư
+                    </>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => handleStatusChange("published")}
+                  disabled={formData.status === "published"}
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  Công khai
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleStatusChange("waiting")}
+                  disabled={formData.status === "waiting"}
+                >
+                  <EyeOff className="w-4 h-4 mr-2" />
+                  Riêng tư
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="outline"
+              onClick={handleDelete}
+              disabled={isSubmitting}
+            >
+              Xóa sự kiện
+            </Button>
+            <Button
+              type="submit"
+              form="edit-conference-form"
+              className="px-8"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}
+            </Button>
+          </>
+        }
+      />
+      <div className="max-w-7xl mx-auto py-6 px-6">
         <div className="relative grid grid-cols-1 lg:grid-cols-3 gap-8">
           <form
+            id="edit-conference-form"
             onSubmit={handleSubmit}
             className="lg:col-span-2 bg-card rounded-xl p-8 space-y-6 shadow-sm"
           >
-            {/* Thumbnail Upload */}
-            <div
-              className="border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center py-10 text-center cursor-pointer hover:border-primary transition-colors"
-              onClick={() => document.getElementById("thumbnail-input")?.click()}
-            >
-              <input
-                id="thumbnail-input"
-                type="file"
-                accept="image/*"
-                onChange={handleThumbnailUpload}
-                className="hidden"
-              />
-              {thumbnailPreview ? (
-                <div className="space-y-2">
-                  <img
-                    src={thumbnailPreview}
-                    alt="Thumbnail preview"
-                    className="max-h-48 mx-auto rounded-lg"
-                  />
-                  <p className="text-sm text-muted-foreground">Nhấn để thay đổi hình ảnh</p>
-                </div>
-              ) : (
-                <>
-                  <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">Tải hình ảnh thumbnail</p>
-                </>
-              )}
-            </div>
-
-            {/* Logo Upload */}
-            <div
-              className="border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center py-10 text-center cursor-pointer hover:border-primary transition-colors"
-              onClick={() => document.getElementById("logo-input")?.click()}
-            >
-              <input
-                id="logo-input"
-                type="file"
-                accept="image/*"
-                onChange={handleLogoUpload}
-                className="hidden"
-              />
-              {logoPreview ? (
-                <div className="space-y-2">
-                  <img
-                    src={logoPreview}
-                    alt="Logo preview"
-                    className="max-h-32 mx-auto rounded-lg"
-                  />
-                  <p className="text-sm text-muted-foreground">Nhấn để thay đổi logo</p>
-                </div>
-              ) : (
-                <>
-                  <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">Tải logo (tùy chọn)</p>
-                </>
-              )}
-            </div>
-
-            {/* Name */}
-            <Input
-              label="Tên sự kiện *"
-              placeholder="Nhập tên của sự kiện tại đây..."
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
-
-            {/* Description */}
+            {/* Thumbnail Upload - Full width */}
             <div className="space-y-2">
-              <Label className="text-base font-medium">Mô tả sự kiện</Label>
-              <Textarea
-                placeholder="Nhập mô tả về sự kiện..."
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={4}
-              />
-            </div>
-
-            {/* Category */}
-            <div className="space-y-2">
-              <Label className="text-base font-medium">Danh mục</Label>
-              <Select
-                value={formData.category_id}
-                onValueChange={(value) => setFormData({ ...formData, category_id: value })}
+              <Label className="text-base font-medium">Ảnh bìa sự kiện (16:9) *</Label>
+              <div
+                className={`border-2 border-dashed rounded-lg flex flex-col items-center justify-center py-12 text-center cursor-pointer hover:border-primary transition-colors aspect-video ${
+                  errors.thumbnail ? 'border-destructive' : 'border-border'
+                }`}
+                onClick={() => document.getElementById("thumbnail-input")?.click()}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Chọn danh mục" />
-                </SelectTrigger>
-                <SelectContent>
-                  {EVENT_CATEGORIES.map((cat) => (
-                    <SelectItem key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <input
+                  id="thumbnail-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleThumbnailUpload}
+                  className="hidden"
+                />
+                {thumbnailPreview ? (
+                  <div className="space-y-2 px-4 w-full">
+                    <img
+                      src={thumbnailPreview}
+                      alt="Thumbnail preview"
+                      className="max-h-48 mx-auto rounded-lg"
+                    />
+                    <p className="text-xs text-muted-foreground">Nhấn để thay đổi</p>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">Tải ảnh bìa</p>
+                    <p className="text-xs text-muted-foreground mt-1">Tỷ lệ 16:9</p>
+                  </>
+                )}
+              </div>
+              {errors.thumbnail && (
+                <p className="text-sm text-destructive">{errors.thumbnail}</p>
+              )}
+            </div>
+
+            {/* Name, Description, and Logo - Grouped */}
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_180px] gap-6">
+              <div className="space-y-6">
+                {/* Name */}
+                <Input
+                  label="Tên sự kiện *"
+                  placeholder="Nhập tên của sự kiện tại đây..."
+                  value={formData.name}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    if (errors.name) setErrors({ ...errors, name: "" });
+                  }}
+                  error={errors.name}
+                  required
+                  maxLength={100}
+                />
+
+                {/* Description */}
+                <div className="space-y-2">
+                  <Label className="text-base font-medium">
+                    Mô tả sự kiện
+                    <span className="text-xs text-muted-foreground ml-2">
+                      ({formData.description.length}/600)
+                    </span>
+                  </Label>
+                  <Textarea
+                    placeholder="Nhập mô tả về sự kiện..."
+                    value={formData.description}
+                    onChange={(e) => {
+                      setFormData({ ...formData, description: e.target.value });
+                      if (errors.description) setErrors({ ...errors, description: "" });
+                    }}
+                    rows={4}
+                    maxLength={600}
+                    className={errors.description ? 'border-destructive' : ''}
+                  />
+                  {errors.description && (
+                    <p className="text-sm text-destructive">{errors.description}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Logo Upload - Right side */}
+              <div className="space-y-2">
+                <Label className="text-base font-medium">Logo</Label>
+                <div
+                  className="border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center p-4 text-center cursor-pointer hover:border-primary transition-colors aspect-square"
+                  onClick={() => document.getElementById("logo-input")?.click()}
+                >
+                  <input
+                    id="logo-input"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                  {logoPreview ? (
+                    <div className="space-y-1 w-full">
+                      <img
+                        src={logoPreview}
+                        alt="Logo preview"
+                        className="w-full h-auto rounded-lg"
+                      />
+                      <p className="text-xs text-muted-foreground">Nhấn để thay đổi</p>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-6 h-6 text-muted-foreground mb-1" />
+                      <p className="text-xs text-muted-foreground">Tải logo</p>
+                      <p className="text-xs text-muted-foreground mt-1">(1:1)</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Category and Capacity - Side by side */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label className="text-base font-medium">Danh mục</Label>
+                <Select
+                  value={formData.category_id}
+                  onValueChange={(value) => setFormData({ ...formData, category_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn danh mục" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EVENT_CATEGORIES.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Input
+                label="Số lượng người tham gia tối đa *"
+                type="number"
+                placeholder="Nhập số lượng tại đây"
+                value={formData.capacity}
+                onChange={(e) => {
+                  setFormData({ ...formData, capacity: e.target.value });
+                  if (errors.capacity) setErrors({ ...errors, capacity: "" });
+                }}
+                error={errors.capacity}
+                required
+                min="1"
+              />
             </div>
 
             {/* Tags */}
@@ -598,17 +800,6 @@ const EditConference = () => {
               options={[]}
               value={formData.tags}
               onChange={(selected) => setFormData({ ...formData, tags: selected })}
-            />
-
-            {/* Capacity */}
-            <Input
-              label="Số lượng người tham gia tối đa *"
-              type="number"
-              placeholder="Nhập số lượng tại đây"
-              value={formData.capacity}
-              onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-              required
-              min="1"
             />
 
             {/* Time */}
@@ -621,16 +812,27 @@ const EditConference = () => {
                     <Input
                       type="date"
                       value={formData.startDate}
-                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, startDate: e.target.value });
+                        if (errors.startTime) setErrors({ ...errors, startTime: "" });
+                      }}
+                      error={errors.startTime ? " " : ""}
                       required
                     />
                     <Input
                       type="time"
                       value={formData.startTime}
-                      onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, startTime: e.target.value });
+                        if (errors.startTime) setErrors({ ...errors, startTime: "" });
+                      }}
+                      error={errors.startTime ? " " : ""}
                       required
                     />
                   </div>
+                  {errors.startTime && (
+                    <p className="text-sm text-destructive">{errors.startTime}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">Đến</Label>
@@ -638,32 +840,29 @@ const EditConference = () => {
                     <Input
                       type="date"
                       value={formData.endDate}
-                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, endDate: e.target.value });
+                        if (errors.endTime) setErrors({ ...errors, endTime: "" });
+                      }}
+                      error={errors.endTime ? " " : ""}
                       required
                     />
                     <Input
                       type="time"
                       value={formData.endTime}
-                      onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, endTime: e.target.value });
+                        if (errors.endTime) setErrors({ ...errors, endTime: "" });
+                      }}
+                      error={errors.endTime ? " " : ""}
                       required
                     />
                   </div>
+                  {errors.endTime && (
+                    <p className="text-sm text-destructive">{errors.endTime}</p>
+                  )}
                 </div>
               </div>
-            </div>
-
-            {/* Location */}
-            <div className="space-y-2">
-              <Label className="text-base font-medium">Địa điểm tổ chức *</Label>
-              <Input
-                placeholder="Chọn vị trí trên bản đồ để tự động điền địa chỉ"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                Địa chỉ sẽ tự động cập nhật khi bạn chọn vị trí trên bản đồ. Bạn cũng có thể chỉnh sửa thủ công.
-              </p>
             </div>
 
             {/* Map Location Picker */}
@@ -679,23 +878,33 @@ const EditConference = () => {
                     lng: lng.toString(),
                     location: locationName,
                   });
+                  if (errors.location) setErrors({ ...errors, location: "" });
                 }}
               />
             </div>
 
-            <div className="flex justify-between gap-4 pt-4">
-              <Button type="button" variant="destructive" onClick={handleDelete}>
-                Xóa sự kiện
-              </Button>
-              <Button type="submit" className="px-8" disabled={isSubmitting}>
-                {isSubmitting ? "Đang cập nhật..." : "Lưu thông tin"}
-              </Button>
+            {/* Location */}
+            <div className="space-y-2">
+              <Label className="text-base font-medium">Địa điểm tổ chức *</Label>
+              <Input
+                placeholder="Chọn vị trí trên bản đồ để tự động điền địa chỉ"
+                value={formData.location}
+                onChange={(e) => {
+                  setFormData({ ...formData, location: e.target.value });
+                  if (errors.location) setErrors({ ...errors, location: "" });
+                }}
+                error={errors.location}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Địa chỉ sẽ tự động cập nhật khi bạn chọn vị trí trên bản đồ. Bạn cũng có thể chỉnh sửa thủ công.
+              </p>
             </div>
           </form>
 
           {/* Right Reviewer Section */}
           <div className="flex flex-col">
-            <div className="bg-card rounded-xl p-8 shadow-sm h-fit flex flex-col">
+            <div className="bg-card rounded-xl p-8 shadow-sm h-fit flex flex-col sticky top-32">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-heading font-medium text-lg">Danh sách diễn giả</h2>
                 <Button variant="secondary" onClick={() => handleOpenSpeakerModal()}>

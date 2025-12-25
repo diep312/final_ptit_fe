@@ -105,11 +105,11 @@ const ConferenceDetail = () => {
 
   return (
     <ConferenceLayout>
-      <div className="px-6 py-6">
+      <div className="px-10 py-6">
         <ConferenceTopBar title={event?.name || "Hội nghị"} />
         <div id="dashboard" className="space-y-8">
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-14 items-stretch">
-            <div className="xl:col-span-7 space-y-3">
+            <div className="xl:col-span-7 space-y-5">
               <ConferenceHeader
                 conference={{
                   startDate: event?.start_time ? new Date(event.start_time).toLocaleString("vi-VN") : "",

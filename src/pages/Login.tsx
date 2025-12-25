@@ -35,6 +35,14 @@ const Login = () => {
     email: "",
     password: "",
   });
+  const [errors, setErrors] = useState({
+    email: "",
+    password: "",
+  });
+  const [touched, setTouched] = useState({
+    email: false,
+    password: false,
+  });
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -47,12 +55,80 @@ const Login = () => {
     }
   }, [isAuthenticated, userType, navigate]);
 
+  // Email validation
+  const validateEmail = (email: string): string => {
+    if (!email) {
+      return "Email là bắt buộc";
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return "Email không hợp lệ";
+    }
+    return "";
+  };
+
+  // Password validation
+  const validatePassword = (password: string): string => {
+    if (!password) {
+      return "Mật khẩu là bắt buộc";
+    }
+    if (password.length < 6) {
+      return "Mật khẩu phải có ít nhất 6 ký tự";
+    }
+    return "";
+  };
+
+  // Handle field blur
+  const handleBlur = (field: "email" | "password") => {
+    setTouched({ ...touched, [field]: true });
+    
+    if (field === "email") {
+      setErrors({ ...errors, email: validateEmail(formData.email) });
+    } else if (field === "password") {
+      setErrors({ ...errors, password: validatePassword(formData.password) });
+    }
+  };
+
+  // Handle field change
+  const handleChange = (field: "email" | "password", value: string) => {
+    setFormData({ ...formData, [field]: value });
+    
+    // Clear error when user starts typing
+    if (touched[field]) {
+      if (field === "email") {
+        setErrors({ ...errors, email: validateEmail(value) });
+      } else if (field === "password") {
+        setErrors({ ...errors, password: validatePassword(value) });
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Try unified admin/system_user login first
-    const loginResult = await safeRequest<LoginResponse>(async () => {
-      return await api.post<LoginResponse>("/admin/auth/login", {
+    // Validate all fields
+    const emailError = validateEmail(formData.email);
+    const passwordError = validatePassword(formData.password);
+
+    setErrors({
+      email: emailError,
+      password: passwordError,
+    });
+
+    setTouched({
+      email: true,
+      password: true,
+    });
+
+    // Don't submit if there are errors
+    if (emailError || passwordError) {
+      return;
+    }
+
+    let loginSuccess = false;
+
+    try {
+      const adminLoginResult = await api.post<LoginResponse>("/admin/auth/login", {
         email: formData.email,
         password: formData.password,
       });
@@ -175,16 +251,20 @@ const Login = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <Input
-              label="Email"
-              type="email"
-              placeholder="Nhập email"
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
-              required
-            />
+            <div>
+              <Input
+                label="Email"
+                type="email"
+                placeholder="Nhập email"
+                value={formData.email}
+                onChange={(e) => handleChange("email", e.target.value)}
+                onBlur={() => handleBlur("email")}
+                required
+              />
+              {touched.email && errors.email && (
+                <p className="text-sm text-red-500 mt-1">{errors.email}</p>
+              )}
+            </div>
 
             <div className="relative">
               <Input
@@ -192,9 +272,8 @@ const Login = () => {
                 type={showPassword ? "text" : "password"}
                 placeholder="Nhập mật khẩu"
                 value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
+                onChange={(e) => handleChange("password", e.target.value)}
+                onBlur={() => handleBlur("password")}
                 required
               />
               <button
@@ -208,6 +287,9 @@ const Login = () => {
                   <Eye className="w-5 h-5" />
                 )}
               </button>
+              {touched.password && errors.password && (
+                <p className="text-sm text-red-500 mt-1">{errors.password}</p>
+              )}
             </div>
 
             <Button type="submit" className="w-full h-11 font-medium">
