@@ -92,6 +92,8 @@ const ConferenceDetail = () => {
 
         return {
           time: timeStr,
+          startAt: s.start_time ?? s.start ?? undefined,
+          endAt: s.end_time ?? s.end ?? undefined,
           title: s.title ?? s.name ?? "Phiên",
           description: s.description ?? s.prerequisites ?? "",
           room: s.place ?? s.room ?? s.location ?? "",

@@ -429,7 +429,7 @@ const CreateConference = () => {
             className="lg:col-span-2 bg-card rounded-xl p-8 space-y-6 shadow-sm"
           >
             {/* Thumbnail Upload - Full width */}
-            <div className="space-y-2">
+            <div className="space-y-2 ">
               <Label className="text-base font-medium">Ảnh bìa sự kiện (16:9) *</Label>
               <div
                 className={`border-2 border-dashed rounded-lg flex flex-col items-center justify-center py-6 text-center cursor-pointer hover:border-primary transition-colors aspect-video ${

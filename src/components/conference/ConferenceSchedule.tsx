@@ -5,6 +5,8 @@ import type { ScheduleSpeaker } from "./ScheduleCard";
 
 export interface ScheduleItem {
   time: string;
+  startAt?: string; // ISO datetime
+  endAt?: string; // ISO datetime
   title: string;
   speaker: string; // fallback single speaker name
   location?: string; // legacy key
@@ -45,6 +47,8 @@ export const ConferenceSchedule: React.FC<ConferenceScheduleProps> = ({
               key={index}
               startTime={start}
               endTime={end}
+              startAt={item.startAt}
+              endAt={item.endAt}
               title={item.title}
               description={item.description}
               room={room}

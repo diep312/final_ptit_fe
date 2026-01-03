@@ -1,15 +1,32 @@
 import { Bell, Home, Settings, LogOut, Plus } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { NavButton } from "@/components/common/NavButton";
 import { useAuth } from "@/contexts/AuthContext";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+function toStaticUrl(maybePath?: string | null): string | undefined {
+  if (!maybePath) return undefined;
+  const s = String(maybePath);
+  if (!s) return undefined;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/static/")) return s;
+  const cleaned = s.startsWith("/") ? s.slice(1) : s;
+  return `/static/${cleaned}`;
+}
 
 export const Navigation = () => {
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const { user, userType, logout } = useAuth();
 
   const handleLogout = async () => {
     await logout();
+  };
+
+  const handleOpenProfile = () => {
+    if (userType === "organizer") navigate("/organizer/profile");
+    else if (userType === "admin" || userType === "system_user") navigate("/profile");
   };
 
   const navItems = [
@@ -68,13 +85,20 @@ export const Navigation = () => {
           </div>
 
           {/* Right Section */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground text-sm font-medium">
-                  {user?.name?.charAt(0).toUpperCase() || "U"}
-                </span>
-              </div>
+          <div className="flex items-center gap-4 max-w-[250px]">
+            <button
+              type="button"
+              onClick={handleOpenProfile}
+              className="flex items-center gap-3 text-left"
+            >
+              <Avatar className="h-8 w-8">
+                {user?.avatar ? (
+                  <AvatarImage src={toStaticUrl(user.avatar)} alt={user?.name || "User"} />
+                ) : null}
+                <AvatarFallback>
+                  {(user?.name?.charAt(0) || "U").toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
               <div className="hidden lg:block text-sm">
                 <div className="font-medium text-foreground">
                   {user?.name || "User"}
@@ -83,7 +107,7 @@ export const Navigation = () => {
                   {user?.email || ""}
                 </div>
               </div>
-            </div>
+            </button>
           </div>
         </div>
       </div>

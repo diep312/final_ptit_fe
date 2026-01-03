@@ -139,6 +139,30 @@ const CheckIn = () => {
 
       const extractRegistrationId = (text: string) => {
         if (!text) return null;
+
+        // If it's JSON, try to extract a meaningful identifier.
+        // Supported shapes:
+        // - { registration_id: "<uuid>" }
+        // - { registrationId: "<uuid>" }
+        // - { registeredID: "<number>" }  (maps on backend)
+        if ((text.startsWith("{") && text.endsWith("}")) || (text.startsWith("[") && text.endsWith("]"))) {
+          try {
+            const obj: any = JSON.parse(text);
+            const candidate =
+              obj?.registration_id ??
+              obj?.registrationId ??
+              obj?._id ??
+              obj?.id ??
+              obj?.registeredID ??
+              obj?.registeredId;
+            if (candidate !== undefined && candidate !== null) {
+              return String(candidate).trim();
+            }
+          } catch {
+            // not valid json
+          }
+        }
+
         // UUID v4 pattern
         const uuid = text.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/);
         if (uuid) return uuid[0];
@@ -153,14 +177,21 @@ const CheckIn = () => {
         } catch (e) {
           // not a url
         }
-        // Fallback: if the scanned string is short-ish, treat it as an id
-        if (text.length > 3 && text.length < 100) return text;
+
+        // Fallback: if it's numeric and short-ish, treat it as an id (backend can map it)
+        if (/^\d{1,12}$/.test(text)) return text;
         return null;
       };
 
-  const registrationId = extractRegistrationId(scanned);
+      const registrationId = extractRegistrationId(scanned);
       if (!registrationId) {
         toast({ title: 'QR không hợp lệ', description: 'Không tìm thấy mã đăng ký trong QR.' });
+        setTimeout(() => startScanning(), 1000);
+        return;
+      }
+
+      if (!id) {
+        toast({ title: 'Thiếu event_id', description: 'Không xác định được sự kiện để check-in.' });
         setTimeout(() => startScanning(), 1000);
         return;
       }

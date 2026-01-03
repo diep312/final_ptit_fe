@@ -127,10 +127,6 @@ const OrganizerProfile = () => {
       await api.post("/organizer/details/upsert", {
         organization_name: derivedOrganizationName,
         description,
-        // Keep other optional fields untouched (not part of this UX).
-        address: details?.address ?? "",
-        website: details?.website ?? "",
-        logo_url: details?.logo_url ?? "",
       });
 
       toast.success("Cập nhật thông tin thành công");
@@ -185,58 +181,65 @@ const OrganizerProfile = () => {
             <CardDescription>Cập nhật thông tin cá nhân của bạn</CardDescription>
           </CardHeader>
           <CardContent>
+
             <form onSubmit={handleUpdateProfile} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Họ và tên</Label>
-                <Input
-                  id="name"
-                  value={profileData.name}
-                  onChange={(e) =>
-                    setProfileData({ ...profileData, name: e.target.value })
-                  }
-                  placeholder="Nhập họ và tên"
-                  required
-                />
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_180px] gap-6 items-start">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Họ và tên</Label>
+                  <Input
+                    id="name"
+                    value={profileData.name}
+                    onChange={(e) =>
+                      setProfileData({ ...profileData, name: e.target.value })
+                    }
+                    placeholder="Nhập họ và tên"
+                    required
+                  />
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={profileData.email}
-                  readOnly
-                  disabled
-                />
-              </div>
+                  <Label htmlFor="email" className="mt-4">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={profileData.email}
+                    readOnly
+                    disabled
+                  />
 
-              <div className="space-y-2">
-                <Label htmlFor="phone">Số điện thoại</Label>
-                <Input id="phone" value={profileData.phone} readOnly disabled />
-              </div>
+                  <Label htmlFor="phone" className="mt-4">Số điện thoại</Label>
+                  <Input id="phone" value={profileData.phone} readOnly disabled />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="avatar">Ảnh đại diện</Label>
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center overflow-hidden">
+                {/* Avatar Upload - Right side */}
+                <div className="space-y-2">
+                  <Label className="text-base font-medium">Ảnh đại diện</Label>
+                  <div
+                    className="border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center p-4 text-center cursor-pointer hover:border-primary transition-colors aspect-square w-full max-w-[160px] mx-auto"
+                    onClick={() => document.getElementById('avatar-input')?.click()}
+                  >
+                    <input
+                      id="avatar-input"
+                      type="file"
+                      accept="image/jpeg,image/png,image/svg+xml,image/webp"
+                      onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
+                      className="hidden"
+                    />
                     {avatarPreviewUrl ? (
-                      <img
-                        src={avatarPreviewUrl}
-                        alt="Avatar"
-                        className="w-full h-full object-cover"
-                      />
+                      <div className="space-y-1 w-full">
+                        <img
+                          src={avatarPreviewUrl}
+                          alt="Avatar preview"
+                          className="w-full h-auto rounded-lg"
+                        />
+                        <p className="text-xs text-muted-foreground">Nhấn để thay đổi</p>
+                      </div>
                     ) : (
-                      <span className="text-primary-foreground text-lg font-medium">
-                        {(profileData.name?.charAt(0) || "U").toUpperCase()}
-                      </span>
+                      <>
+                        <svg className="w-6 h-6 text-muted-foreground mb-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                        <p className="text-xs text-muted-foreground">Tải ảnh đại diện</p>
+                        <p className="text-xs text-muted-foreground mt-1">(1:1)</p>
+                      </>
                     )}
                   </div>
-                  <Input
-                    id="avatar"
-                    type="file"
-                    accept="image/jpeg,image/png,image/svg+xml,image/webp"
-                    onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
-                  />
                 </div>
               </div>
 

@@ -15,6 +15,7 @@ export interface UserProfile {
   name: string;
   email: string;
   phone: string;
+  avatar?: string; // for organizer
   roles?: Array<{
     _id: string;
     name: string;

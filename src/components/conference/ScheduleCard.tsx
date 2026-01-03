@@ -11,6 +11,8 @@ export interface ScheduleSpeaker {
 export interface ScheduleCardProps {
   startTime: string; // HH:mm
   endTime: string; // HH:mm
+  startAt?: string | Date; // full datetime (preferred)
+  endAt?: string | Date; // full datetime (preferred)
   title: string;
   description?: string;
   room?: string;
@@ -25,11 +27,47 @@ const getInitials = (name: string) => {
   return (first + last).toUpperCase();
 };
 
-const isHappeningNow = (startTime: string, endTime: string) => {
+const toDate = (value?: string | Date) => {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const formatDateLabel = (startAt?: string | Date, endAt?: string | Date) => {
+  const start = toDate(startAt);
+  const end = toDate(endAt);
+  if (!start) return "";
+
+  const startLabel = start.toLocaleDateString("vi-VN");
+  if (!end) return startLabel;
+
+  const sameDay =
+    start.getFullYear() === end.getFullYear() &&
+    start.getMonth() === end.getMonth() &&
+    start.getDate() === end.getDate();
+
+  if (sameDay) return startLabel;
+  return `${startLabel} - ${end.toLocaleDateString("vi-VN")}`;
+};
+
+const isHappeningNow = (
+  startTime: string,
+  endTime: string,
+  startAt?: string | Date,
+  endAt?: string | Date,
+) => {
+  const now = new Date();
+
+  const startDateTime = toDate(startAt);
+  const endDateTime = toDate(endAt);
+  if (startDateTime && endDateTime) {
+    return now >= startDateTime && now <= endDateTime;
+  }
+
+  // Backward-compatible fallback: interpret times as "today".
   const [sh, sm] = startTime.split(":").map((n) => parseInt(n, 10));
   const [eh, em] = endTime.split(":").map((n) => parseInt(n, 10));
   if ([sh, sm, eh, em].some((v) => Number.isNaN(v))) return false;
-  const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), sh, sm, 0, 0);
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), eh, em, 0, 0);
   return now >= start && now <= end;
@@ -38,16 +76,22 @@ const isHappeningNow = (startTime: string, endTime: string) => {
 export const ScheduleCard: React.FC<ScheduleCardProps> = ({
   startTime,
   endTime,
+  startAt,
+  endAt,
   title,
   description,
   room,
   speakers = [],
 }) => {
-  const happening = isHappeningNow(startTime, endTime);
+  const happening = isHappeningNow(startTime, endTime, startAt, endAt);
+  const dateLabel = formatDateLabel(startAt, endAt);
 
   return (
     <div className="grid grid-cols-[72px,1fr] gap-4 items-stretch">
       <div className="flex flex-col items-start justify-center text-sm text-muted-foreground">
+        {dateLabel ? (
+          <span className="text-xs text-muted-foreground">{dateLabel}</span>
+        ) : null}
         <span>{startTime}</span>
         <span className="mt-6">{endTime}</span>
       </div>

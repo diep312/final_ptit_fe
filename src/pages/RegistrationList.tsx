@@ -18,7 +18,7 @@ import { Filter } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
 
 // Form field types
-type FormFieldType = "text" | "email" | "multipleChoice" | "textarea" | "number";
+type FormFieldType = "text" | "email" | "multipleChoice" | "textarea" | "number" | "date";
 
 type FormField = {
   id: string;
@@ -90,8 +90,8 @@ const RegistrationList = () => {
       // Get registrations
       const resAny: any = await api.get(`/organizer/events/${id}/registrations`);
       if (!resAny) return;
-      const res: any = resAny;
-      setRegistrations(res.registrations || []);
+      const payload: any = resAny?.data ?? resAny;
+      setRegistrations(payload?.registrations || []);
     }).finally(() => setLoading(false));
   }, [id]);
 
@@ -150,7 +150,15 @@ const RegistrationList = () => {
             {/* <Button variant="outline" onClick={() => {}}>
               <Filter className="h-4 w-4 mr-2" /> Lọc
             </Button> */}
-            <Input className="mx-auto" placeholder="Nhập tên cần tìm kiếm..." value={searchQuery} onChange={(e:any) => { setSearchQuery(e.target.value); setCurrentPage(1); }} className="flex-1 max-w-md" />
+            <Input
+              className="mx-auto flex-1 max-w-md"
+              placeholder="Nhập tên cần tìm kiếm..."
+              value={searchQuery}
+              onChange={(e: any) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+            />
           </div>
 
           <div className="rounded-lg border bg-white min-w-0 overflow-y-auto h-[580px] mx-auto" style={{ maxWidth: 'calc(100vw - 200px)' }}>
