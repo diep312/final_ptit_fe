@@ -37,9 +37,99 @@ const CheckIn = () => {
     | { open: true; type: "success" | "failure"; message: string; fading: boolean }
   >({ open: false });
 
-  // Conference data - in real app, fetch from API using id
-  const conferenceTitle = "Hội nghị Công nghệ Số Việt Nam 2025";
   const { api, safeRequest } = useApi();
+  const [conferenceTitle, setConferenceTitle] = useState<string>("Hội nghị");
+
+  useEffect(() => {
+    const loadTitle = async () => {
+      if (!id) return;
+      const evRes = await safeRequest(() => api.get(`/organizer/events/${id}`));
+      const evData = (evRes as any)?.data ?? evRes ?? null;
+      const title = evData?.name ?? evData?.title ?? evData?.event_name;
+      if (title) setConferenceTitle(String(title));
+    };
+
+    loadTitle();
+  }, [id, api, safeRequest]);
+
+  const extractRegistrationId = (text: string) => {
+    if (!text) return null;
+
+    // If it's JSON, try to extract a meaningful identifier.
+    // Supported shapes:
+    // - { registration_id: "<uuid>" }
+    // - { registrationId: "<uuid>" }
+    // - { registeredID: "<number>" }  (maps on backend)
+    if ((text.startsWith("{") && text.endsWith("}")) || (text.startsWith("[") && text.endsWith("]"))) {
+      try {
+        const obj: any = JSON.parse(text);
+        const candidate =
+          obj?.registration_id ??
+          obj?.registrationId ??
+          obj?._id ??
+          obj?.id ??
+          obj?.registeredID ??
+          obj?.registeredId;
+        if (candidate !== undefined && candidate !== null) {
+          return String(candidate).trim();
+        }
+      } catch {
+        // not valid json
+      }
+    }
+
+    // UUID v4 pattern
+    const uuid = text.match(
+      /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/
+    );
+    if (uuid) return uuid[0];
+    // Mongo ObjectId (24 hex)
+    const objId = text.match(/[0-9a-fA-F]{24}/);
+    if (objId) return objId[0];
+    // If it's a URL, use last path segment
+    try {
+      const u = new URL(text);
+      const parts = u.pathname.split("/").filter(Boolean);
+      if (parts.length) return parts[parts.length - 1];
+    } catch {
+      // not a url
+    }
+
+    // Fallback: if it's numeric and short-ish, treat it as an id (backend can map it)
+    if (/^\d{1,12}$/.test(text)) return text;
+    return null;
+  };
+
+  const pauseScanner = () => {
+    const s: any = scannerRef.current;
+    if (!s) return;
+    if (typeof s.pause === "function") {
+      try {
+        s.pause(true);
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const resumeScanner = () => {
+    const s: any = scannerRef.current;
+    if (!s) {
+      // Fallback if scanner was stopped/cleared by something else.
+      startScanning();
+      return;
+    }
+    if (typeof s.resume === "function") {
+      try {
+        s.resume();
+      } catch {
+        // ignore
+      }
+    } else {
+      // Older versions: fallback to restart
+      startScanning();
+    }
+  };
 
   useEffect(() => {
     // Audio cues (kept in public/ so we can reference root paths)
@@ -191,77 +281,29 @@ const CheckIn = () => {
     lastScanAtRef.current = now;
 
     const raw = (qrCode || "").trim();
-    if (raw && raw === lastHandledQrRef.current && now - lastHandledAtRef.current < SCAN_DEADTIME_MS) {
-      return;
-    }
+    const registrationId = extractRegistrationId(raw);
+    const dedupeKey = (registrationId ?? raw).trim();
+    if (dedupeKey && dedupeKey === lastHandledQrRef.current && now - lastHandledAtRef.current < SCAN_DEADTIME_MS) return;
 
     isProcessingScanRef.current = true;
+    // Pause decoding ASAP so holding the QR in view doesn't spam callbacks.
+    pauseScanner();
 
     console.log("QR Code scanned:", qrCode);
 
     // Reset inactivity timer when QR code is scanned
     resetInactivityTimer();
 
-    // Stop scanning temporarily to process the QR code
-    await stopScanning();
-
     try {
-      // Extract registration id from scanned content
-      const scanned = raw;
-
-      const extractRegistrationId = (text: string) => {
-        if (!text) return null;
-
-        // If it's JSON, try to extract a meaningful identifier.
-        // Supported shapes:
-        // - { registration_id: "<uuid>" }
-        // - { registrationId: "<uuid>" }
-        // - { registeredID: "<number>" }  (maps on backend)
-        if ((text.startsWith("{") && text.endsWith("}")) || (text.startsWith("[") && text.endsWith("]"))) {
-          try {
-            const obj: any = JSON.parse(text);
-            const candidate =
-              obj?.registration_id ??
-              obj?.registrationId ??
-              obj?._id ??
-              obj?.id ??
-              obj?.registeredID ??
-              obj?.registeredId;
-            if (candidate !== undefined && candidate !== null) {
-              return String(candidate).trim();
-            }
-          } catch {
-            // not valid json
-          }
-        }
-
-        // UUID v4 pattern
-        const uuid = text.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/);
-        if (uuid) return uuid[0];
-        // Mongo ObjectId (24 hex)
-        const objId = text.match(/[0-9a-fA-F]{24}/);
-        if (objId) return objId[0];
-        // If it's a URL, use last path segment
-        try {
-          const u = new URL(text);
-          const parts = u.pathname.split('/').filter(Boolean);
-          if (parts.length) return parts[parts.length - 1];
-        } catch (e) {
-          // not a url
-        }
-
-        // Fallback: if it's numeric and short-ish, treat it as an id (backend can map it)
-        if (/^\d{1,12}$/.test(text)) return text;
-        return null;
-      };
-
-      const registrationId = extractRegistrationId(scanned);
       if (!registrationId) {
         toast({ title: 'QR không hợp lệ', description: 'Không tìm thấy mã đăng ký trong QR.' });
         showCheckinFeedback('failure', 'QR không hợp lệ');
+        // Deadtime to avoid repeatedly showing the same failure while QR stays in view
+        lastHandledQrRef.current = dedupeKey;
+        lastHandledAtRef.current = Date.now();
         setTimeout(() => {
           isProcessingScanRef.current = false;
-          startScanning();
+          resumeScanner();
         }, 1000);
         return;
       }
@@ -269,9 +311,11 @@ const CheckIn = () => {
       if (!id) {
         toast({ title: 'Thiếu event_id', description: 'Không xác định được sự kiện để check-in.' });
         showCheckinFeedback('failure', 'Thiếu event_id');
+        lastHandledQrRef.current = dedupeKey;
+        lastHandledAtRef.current = Date.now();
         setTimeout(() => {
           isProcessingScanRef.current = false;
-          startScanning();
+          resumeScanner();
         }, 1000);
         return;
       }
@@ -283,9 +327,11 @@ const CheckIn = () => {
       if (!res) {
         // safeRequest already shows error via feedback provider. Restart scanning.
         showCheckinFeedback('failure', 'Check-in thất bại');
+        lastHandledQrRef.current = dedupeKey;
+        lastHandledAtRef.current = Date.now();
         setTimeout(() => {
           isProcessingScanRef.current = false;
-          startScanning();
+          resumeScanner();
         }, 1000);
         return;
       }
@@ -294,28 +340,28 @@ const CheckIn = () => {
       toast({ title: 'Check-in', description: String(msg) });
       showCheckinFeedback('success', String(msg));
 
-      // Deadtime for same QR content
-      lastHandledQrRef.current = scanned;
+      // Deadtime for same registration id (even if QR string varies)
+      lastHandledQrRef.current = dedupeKey;
       lastHandledAtRef.current = Date.now();
 
       // Restart scanning after a short pause so operator can see feedback
       setTimeout(() => {
         isProcessingScanRef.current = false;
-        startScanning();
-      }, 1000);
+        resumeScanner();
+      }, 3000);
     } catch (err) {
       console.error("Error processing QR code:", err);
       toast({ title: 'Lỗi', description: (err as Error)?.message ?? 'Lỗi khi xử lý QR' });
       showCheckinFeedback('failure', (err as Error)?.message ?? 'Lỗi khi xử lý QR');
 
       // Deadtime for same QR content (even on failures)
-      lastHandledQrRef.current = raw;
+      lastHandledQrRef.current = dedupeKey || raw;
       lastHandledAtRef.current = Date.now();
       // Restart scanning even if there's an error
       setTimeout(() => {
         isProcessingScanRef.current = false;
-        startScanning();
-      }, 1000);
+        resumeScanner();
+      }, 3000);
     }
   };
 
@@ -436,33 +482,32 @@ const CheckIn = () => {
               >
                 {/* Scanner will be injected here by html5-qrcode */}
               </div>
-
-              {/* Result modal overlay */}
-              {checkinFeedback.open && (
-                <div
-                  className={
-                    "absolute inset-0 z-20 flex items-center justify-center p-6 transition-opacity duration-500 " +
-                    (checkinFeedback.fading ? "opacity-0" : "opacity-100")
-                  }
-                >
-                  <div className="bg-white/95 rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
-                    <div className="flex justify-center mb-4">
-                      <img
-                        src={checkinFeedback.type === "success" ? imageCheckInComplete : imageCheckInFailed}
-                        alt={checkinFeedback.type === "success" ? "Check-in thành công" : "Check-in thất bại"}
-                        className="w-28 h-28 object-contain"
-                      />
-                    </div>
-                    <h3 className="text-xl font-heading font-semibold text-gray-900">
-                      {checkinFeedback.type === "success" ? "Check-in thành công" : "Check-in thất bại"}
-                    </h3>
-                    <p className="mt-2 text-sm text-gray-600 break-words">{checkinFeedback.message}</p>
-                  </div>
-                </div>
-              )}
-
               {/* Overlay with corner indicators */}
             </div>
+
+            {/* Result modal overlay */}
+            {checkinFeedback.open && (
+              <div
+                className={
+                  "absolute inset-0 z-20 flex items-center justify-center p-6 transition-opacity duration-500 " +
+                  (checkinFeedback.fading ? "opacity-0" : "opacity-100")
+                }
+              >
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-8 md:p-10 text-center">
+                  <div className="flex justify-center mb-6">
+                    <img
+                      src={checkinFeedback.type === "success" ? imageCheckInComplete : imageCheckInFailed}
+                      alt={checkinFeedback.type === "success" ? "Check-in thành công" : "Check-in thất bại"}
+                      className="w-[300px] md:w-[600px] h-auto"
+                    />
+                  </div>
+                  <h3 className="text-xl md:text-3xl font-heading font-semibold text-gray-900">
+                    {checkinFeedback.type === "success" ? "Check-in thành công" : "Check-in thất bại"}
+                  </h3>
+                  <p className="mt-3 text-base md:text-lg text-gray-600 break-words">{checkinFeedback.message}</p>
+                </div>
+              </div>
+            )}
 
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
