@@ -2,6 +2,7 @@ import React from "react";
 import { MapPin } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { start } from "repl";
 
 export interface ScheduleSpeaker {
   name: string;
@@ -73,6 +74,27 @@ const isHappeningNow = (
   return now >= start && now <= end;
 };
 
+const isEndedNow = (
+  startTime: string,
+  endTime: string,
+  startAt?: string | Date,
+  endAt?: string | Date,
+) => {
+  const now = new Date();
+
+  const startDateTime = toDate(startAt);
+  const endDateTime = toDate(endAt);
+  if (startDateTime && endDateTime) {
+    return now > endDateTime;
+  }
+
+  const [sh, sm] = startTime.split(":").map((n) => parseInt(n, 10));
+  const [eh, em] = endTime.split(":").map((n) => parseInt(n, 10));
+  if ([sh, sm, eh, em].some((v) => Number.isNaN(v))) return false;
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), eh, em, 0, 0);
+  return now > end;
+};
+
 export const ScheduleCard: React.FC<ScheduleCardProps> = ({
   startTime,
   endTime,
@@ -84,16 +106,21 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
   speakers = [],
 }) => {
   const happening = isHappeningNow(startTime, endTime, startAt, endAt);
+  const isEnded = isEndedNow(startTime, endTime, startAt, endAt);
   const dateLabel = formatDateLabel(startAt, endAt);
+  console.log(speakers);
 
   return (
     <div className="grid grid-cols-[72px,1fr] gap-4 items-stretch">
-      <div className="flex flex-col items-start justify-center text-sm text-muted-foreground">
+      <div className="flex flex-col items-start justify-start text-sm text-muted-foreground pt-6">
         {dateLabel ? (
-          <span className="text-xs text-muted-foreground">{dateLabel}</span>
+          <span className="text-lg text-black font-bold">{dateLabel}</span>
         ) : null}
-        <span>{startTime}</span>
-        <span className="mt-6">{endTime}</span>
+        <div className="items-center flex flex-col pt-4">
+          <span>{startTime}</span>
+          <span>•</span>
+          <span>{endTime}</span>
+        </div>
       </div>
 
       <div
@@ -118,12 +145,13 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
                   : "bg-muted text-muted-foreground",
               )}
             >
-              {happening ? "Đang diễn ra" : "Sắp diễn ra"}
+              {happening ? "Đang diễn ra" : 
+              isEnded ? "Đã kết thúc" : "Sắp diễn ra"}
             </span>
           </div>
 
           {description ? (
-            <p className={cn("text-sm leading-relaxed", happening ? "text-white/80" : "text-muted-foreground")}>{description}</p>
+            <p className={cn("text-sm leading-relaxed line-clamp-3", happening ? "text-white/80" : "text-muted-foreground")}>{description}</p>
           ) : null}
 
           <div className="flex items-center gap-2 text-sm">
@@ -131,7 +159,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
             <span className={cn(happening ? "text-white/90" : "text-muted-foreground")}>{room}</span>
           </div>
 
-          {speakers.length > 0 ? (
+          {speakers.length ? (
             <div className="flex items-center gap-2 pt-2">
               {speakers.map((sp, idx) => (
                 <Avatar key={idx} className="h-8 w-8 ring-2 ring-background">

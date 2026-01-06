@@ -87,7 +87,7 @@ export const BarChartCard = ({ title, data: initialData, initialYear, initialWin
             onChange={(e) => setYear(Number(e.target.value))} 
             className="text-xs px-2 py-1 rounded border border-gray-200 bg-background"
           >
-            {Array.from({ length: 5 }).map((_, i) => {
+            {Array.from({ length: 1 }).map((_, i) => {
               const y = now.getFullYear() - i
               return <option key={y} value={y}>{y}</option>
             })}

@@ -27,7 +27,12 @@ export const AdminUserView: React.FC<Props> = ({ open, onOpenChange, id, role = 
     void (async () => {
       setLoading(true)
       await safeRequest(async () => {
-        const path = role === 'admin' ? `/admin/users/${id}` : `/admin/organizers/${id}`
+        const path =
+          role === 'admin'
+            ? `/admin/users/${id}`
+            : role === 'user'
+              ? `/admin/registration-users/${id}`
+              : `/admin/organizers/${id}`
         const res = await api.get(path) as any
         const payload = res?.data ?? res
         setData(payload)
@@ -48,17 +53,17 @@ export const AdminUserView: React.FC<Props> = ({ open, onOpenChange, id, role = 
             <div className="text-center py-6">Đang tải...</div>
           ) : (
             <div className="space-y-3">
-              <FieldRow label="Tên" value={data?.name ?? data?.fullName ?? '-'} />
+              {data?.avatar && (
+                <div className="pt-2">
+                  <img src={data.avatar} alt="avatar" className="w-24 h-24 object-cover rounded mb-4" />
+                </div>
+              )}
+              <FieldRow label="Tên" value={data?.name ?? data?.full_name ?? data?.fullName ?? '-'} />
               <FieldRow label="Email" value={data?.email ?? '-'} />
               <FieldRow label="Số điện thoại" value={data?.phone ?? '-'} />
               <FieldRow label="Vai trò" value={role} />
               <FieldRow label="Trạng thái" value={data?.is_active === false ? 'Vô hiệu' : 'Hoạt động'} />
               {data?.created_at && <FieldRow label="Tạo lúc" value={new Date(data.created_at).toLocaleString()} />}
-              {data?.avatar && (
-                <div className="pt-2">
-                  <img src={data.avatar} alt="avatar" className="w-24 h-24 object-cover rounded" />
-                </div>
-              )}
             </div>
           )}
         </div>

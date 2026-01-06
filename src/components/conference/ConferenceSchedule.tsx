@@ -32,15 +32,14 @@ export const ConferenceSchedule: React.FC<ConferenceScheduleProps> = ({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
           <CalendarClock className="w-5 h-5 text-primary" />
-          Lịch trình hội nghị
+          Tổng quan lịch trình của hội nghị 
         </h2>
-        <button className="text-sm text-primary hover:underline">Xem thêm</button>
       </div>
 
       <div className="space-y-8 max-h-96 overflow-auto">
         {schedule.map((item, index) => {
           const { start, end } = parseTimeRange(item.time);
-          const speakers = item.speakers && item.speakers.length > 0 ? item.speakers : [{ name: item.speaker }];
+          const speakers = item.speakers && item.speakers.length > 0 ? item.speakers : [];
           const room = item.room || item.location;
           return (
             <ScheduleCard

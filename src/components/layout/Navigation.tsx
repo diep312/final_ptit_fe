@@ -36,7 +36,7 @@ export const Navigation = () => {
 
   return (
     <nav className="bg-background sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto border-b border-border">
+      <div className="mx-auto border-b border-border px-16">
         <div className="flex items-center justify-between h-16">
           <div className="flex gap-14">
             {/* Logo */}
@@ -67,12 +67,6 @@ export const Navigation = () => {
                   isActive={location.pathname === item.path}
                 />
               ))}
-              <NavButton
-                label="Thông báo"
-                path="/notifications"
-                icon={Bell}
-                isActive={location.pathname === "/notifications"}
-              />
               <Button
                 variant="ghost"
                 onClick={handleLogout}

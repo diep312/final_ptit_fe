@@ -37,6 +37,7 @@ export type BarOptions = {
   yField: string; // value field
   color?: string; // CSS color
   grid?: boolean;
+  yMax?: number; // optional Y-axis max (e.g. capacity/2)
   valueFormatter?: (value: number) => string | number;
 } & CommonProps;
 
@@ -63,29 +64,42 @@ export const ConferenceStatisticCard: React.FC<ConferenceStatisticCardProps> = (
   const height = typeof props.height === "number" ? `${props.height}px` : props.height || "300px";
 
   if (props.type === "bar") {
-    const { title, data, xField, yField, color = "hsl(var(--primary))", legend = false, tooltip = true, grid = true, valueFormatter, className } = props;
+    const { title, data, xField, yField, color = "hsl(var(--primary))", legend = false, tooltip = true, grid = true, yMax, valueFormatter, className } = props;
 
     const chartConfig: ChartConfig = {
       [yField]: { label: title, color },
     };
 
     return (
-      <div className="bg-white h-fit rounded-2xl border border-gray-100 shadow-sm">
-        <div className="flex items-center justify-between px-5 py-3 border-b">
-          <div className="flex items-center gap-2 text-sm font-medium"><Clock className="h-4 w-4" />{title}</div>
-          <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+      <div className="bg-white h-fit rounded-2xl border border-gray-100 shadow-sm p-6">
+
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-primary" />{title}
+          </h2>
         </div>
+
         <div className="p-4" style={{ height }}>
           <ChartContainer config={chartConfig} className={className}>
             <BarChart data={data}>
               {grid && <CartesianGrid vertical={false} />}
               <XAxis dataKey={xField} tickLine={false} axisLine={false} tickMargin={8} />
-              <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                allowDecimals={false}
+                domain={[0, typeof yMax === "number" && Number.isFinite(yMax) && yMax > 0 ? yMax : "auto"]}
+                tickFormatter={(v) => String(Math.trunc(Number(v)))}
+              />
               {tooltip && (
                 <ChartTooltip
                   cursor={{ fill: "rgba(0,0,0,0.04)" }}
                   content={<ChartTooltipContent nameKey={xField} />}
-                  formatter={(value: any) => [valueFormatter ? valueFormatter(Number(value)) : value, title]}
+                  formatter={(value: any) => {
+                    const n = Math.trunc(Number(value) || 0);
+                    return [valueFormatter ? valueFormatter(n) : n, " lượt"];
+                  }}
                 />
               )}
               <Bar dataKey={yField} fill={color} radius={[6, 6, 0, 0]} />

@@ -5,9 +5,21 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "../ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { AvatarImage } from "@radix-ui/react-avatar";
+import { NavLink } from "react-router-dom";
 
 interface AdminLayoutProps {
   children: ReactNode;
+}
+
+function toStaticUrl(maybePath?: string | null): string | undefined {
+  if (!maybePath) return undefined;
+  const s = String(maybePath);
+  if (!s) return undefined;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/static/")) return s;
+  const cleaned = s.startsWith("/") ? s.slice(1) : s;
+  return `/static/${cleaned}`;
 }
 
 export const AdminLayout = ({ children }: AdminLayoutProps) => {
@@ -31,22 +43,30 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
               </div> */}
 
               <div className="flex items-center gap-4">
-                <Button variant="secondary" size="icon" className="relative flex w-fit px-4">
+                {/* <Button variant="secondary" size="icon" className="relative flex w-fit px-4">
                   <Bell className="w-5 h-5"/>
                   <p className="font-medium font-heading transition-colors text-base">Thông báo</p>
                   <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full"></span>
-                </Button>
+                </Button> */}
 
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                      <span className="text-primary-foreground text-sm font-medium">
-                        {user?.name?.charAt(0).toUpperCase() || "U"}
-                      </span>
-                    </div>
-                    <div className="hidden lg:block text-sm">
-                      <div className="font-medium text-foreground">{user?.name || "User"}</div>
-                      <div className="text-muted-foreground text-xs">{user?.email || ""}</div>
-                    </div>
+                    <NavLink
+                      to="/profile"
+                      className="flex items-center gap-3 text-left"
+                    >
+                      <Avatar className="h-8 w-8">
+                        {user?.avatar ? (
+                          <AvatarImage src={toStaticUrl(user.avatar)} alt={user?.name || "User"} />
+                        ) : null}
+                        <AvatarFallback>
+                          {(user?.name?.charAt(0) || "U").toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="hidden lg:block text-sm">
+                        <div className="font-medium text-foreground">{user?.name || "User"}</div>
+                        <div className="text-muted-foreground text-xs">{user?.email || ""}</div>
+                      </div>
+                    </NavLink>
                   </div>
               </div>
             </div>

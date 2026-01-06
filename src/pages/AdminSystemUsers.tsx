@@ -222,7 +222,7 @@ const AdminSystemUsers = () => {
             onClick={handleCreate}
           >
             <Plus className="w-4 h-4 mr-2" />
-            TẠO NGƯỜI DÙNG
+            Tạo người dùng
           </Button>
         </div>
 

@@ -7,6 +7,13 @@ import { ConferenceList } from "@/components/common/ConferenceList";
 import { useApi } from "@/hooks/use-api";
 import { format } from "date-fns";
 
+type StatItem = {
+  id: number;
+  title: string;
+  count: string;
+  subtitle: string;
+};
+
 interface Event {
   _id: string;
   name: string;
@@ -18,6 +25,7 @@ interface Event {
   thumbnail: string;
   logo: string;
   description?: string;
+  tags?: string[];
 }
 
 interface Conference {
@@ -27,9 +35,11 @@ interface Conference {
   date: string;
   location: string;
   attendees: number;
+  logo: string;
   image: string;
   thumbnail: string;
-  description?: string;
+  description: string;
+  tags: string[];
 }
 
 interface GroupedConferences {
@@ -52,6 +62,26 @@ const Dashboard = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [statistics, setStatistics] = useState<StatItem[]>([]);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      const res = await safeRequest(async () => api.get('/organizer/events/dashboard-stats'));
+      const payload: any = (res as any)?.data ?? res ?? null;
+      const topToday = Array.isArray(payload?.top_today) ? payload.top_today : [];
+
+      const stats: StatItem[] = topToday.slice(0, 3).map((ev: any, idx: number) => ({
+        id: idx + 1,
+        title: ev?.name || 'Hội nghị',
+        count: `${ev?.registrations ?? 0} lượt`,
+        subtitle: 'Tổng lượt đăng ký',
+      }));
+
+      setStatistics(stats);
+    };
+
+    loadStats();
+  }, [api, safeRequest]);
 
   // Fetch events
   useEffect(() => {
@@ -67,10 +97,9 @@ const Dashboard = () => {
           });
           
           if (response) {
-            // Handle wrapped response: { status, success, message, data: { items, total, ... } }
-            const data = response?.data || response;
-            const eventsData = data?.items || (Array.isArray(data) ? data : []);
-            setEvents(eventsData);
+            const payload: any = (response as any)?.data ?? response;
+            const eventsData: Event[] = payload?.data?.items ?? payload?.items ?? (Array.isArray(payload) ? payload : []);
+            setEvents(Array.isArray(eventsData) ? eventsData : []);
           }
         } else {
           // Get all events
@@ -111,9 +140,11 @@ const Dashboard = () => {
         date: dateStr,
         location: event.location,
         attendees: event.capacity || 0,
+        logo: event.logo || "/placeholder.svg",
         image: event.logo || "/placeholder.svg",
         thumbnail: event.thumbnail || "/placeholder.svg",
-        description: event.description,
+        description: event.description || "",
+        tags: event.tags || [],
       };
     });
 
@@ -155,7 +186,7 @@ const Dashboard = () => {
         <div className="space-y-4 overflow-y-auto">
           <SearchBar onSearch={setSearchTerm} searchTerm={searchTerm} />
           <DashboardCalendar />
-          {/* <ConferenceStatistics stats={statistics} /> */}
+          <ConferenceStatistics stats={statistics} />
         </div>
 
         {/* Right Column - Conference List */}

@@ -12,6 +12,7 @@ interface ConferenceCardProps {
   image: string;
   description?: string;
   isEnlarged?: boolean;
+  tags?: string[];
 }
 
 export const ConferenceCard = ({
@@ -23,8 +24,11 @@ export const ConferenceCard = ({
   attendees,
   image,
   description,
+  tags,
   isEnlarged = false,
 }: ConferenceCardProps) => {
+  const safeTags = Array.isArray(tags) ? tags : [];
+
   return (
     <Link to={`/conference/${id}/dashboard`}>
       <motion.div
@@ -69,7 +73,7 @@ export const ConferenceCard = ({
             </motion.h3>
 
             <div className="flex gap-2 items-center pb-3">
-              <span className="bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-full">
+              <span className="bg-primary text-primary-foreground text-md font-medium px-3 py-1 rounded-full">
                 {category}
               </span>
             </div>
@@ -100,6 +104,19 @@ export const ConferenceCard = ({
               <span>{attendees.toLocaleString()} người tham dự</span>
             </div>
           </div>
+
+          {safeTags.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-3">
+              {safeTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center rounded-full border bg-muted px-3 py-1 text-xs font-medium text-foreground"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </motion.div>
     </Link>

@@ -4,6 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 
 interface ConferenceTopBarProps {
 	title: string;
+	thumbnail?: string;
 	navItems?: Array<{ label: string; to: string }>;
 	actions?: React.ReactNode;
 }

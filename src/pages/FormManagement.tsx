@@ -478,7 +478,7 @@ const FormManagement = () => {
                   <div className="space-y-4">
                     {/* Field Header */}
                     <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
+                      <div className="flex-auto">
                         <div className="flex items-center gap-2 mb-2">
                           <Input
                             value={field.label}
@@ -489,7 +489,7 @@ const FormManagement = () => {
                           />
                           {field.required && <span className="text-red-500">*</span>}
                           {field.isDefault && (
-                            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                            <span className="text-xs w-fit text-muted-foreground bg-muted px-4 py-1 rounded">
                               Trường mặc định
                             </span>
                           )}
@@ -634,7 +634,7 @@ const FormManagement = () => {
 
           {/* Add/Reorder Fields Button */}
           <Button
-            variant="secondary"
+            variant="outline"
             className="w-full"
             onClick={() => setIsReorderDialogOpen(true)}
           >

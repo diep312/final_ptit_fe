@@ -157,12 +157,12 @@ const RegistrationList = () => {
     <ConferenceLayout>
       <div className="px-6 py-6 min-w-0">
         <div className="space-y-4 min-w-0">
-          <div className="flex gap-2 items-end">
+          <div className="flex gap-2 items-end mr-10">
             {/* <Button variant="outline" onClick={() => {}}>
               <Filter className="h-4 w-4 mr-2" /> Lọc
             </Button> */}
             <Input
-              className="mx-auto flex-1 max-w-md"
+              className="ml-auto w-full max-w-md"
               placeholder="Nhập tên cần tìm kiếm..."
               value={searchQuery}
               onChange={(e: any) => {
@@ -172,14 +172,12 @@ const RegistrationList = () => {
             />
           </div>
 
-          <div className="rounded-lg border bg-white min-w-0 overflow-y-auto h-[580px] mx-auto" style={{ maxWidth: 'calc(100vw - 200px)' }}>
-            {/* container scrolls horizontally and vertically; keeps fixed card size
-                maxWidth subtracts sidebar+gutter so the card doesn't span the full viewport */}
-            <div style={{ minWidth: tableMinWidth }} className="min-w-0 inline-block" >
-              <Table>
+          <div className="rounded-lg border bg-white min-w-0 overflow-y-auto h-[calc(100vh-260px)] mx-auto" style={{ maxWidth: 'calc(100vw - 200px)' }}>
+            <div style={{ minWidth: tableMinWidth, width: '100%' }} className="min-w-0 w-full">
+              <Table className="table-fixed">
                 <TableHeader>
                   <TableRow className="bg-black">
-                    <TableHead className="min-w-[60px] font-medium text-white">STT</TableHead>
+                    <TableHead className="min-w-[30px] font-medium text-white">STT</TableHead>
                     <TableHead className="min-w-[120px] font-medium text-white">Check-in</TableHead>
                     {fields.map(f => {
                       // Map field type to min-width

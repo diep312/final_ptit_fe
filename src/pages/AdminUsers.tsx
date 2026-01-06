@@ -2,11 +2,12 @@ import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Eye, Edit, Trash2 } from "lucide-react";
+import { Search, Eye, Edit, Trash2, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApi } from "@/hooks/use-api";
 import AdminUserForm from "@/components/admin/AdminUserForm";
 import AdminUserView from "@/components/admin/AdminUserView";
+import AdminAppUserForm from "@/components/admin/AdminAppUserForm";
 
 interface UserRow {
   _id: string;
@@ -18,29 +19,30 @@ interface UserRow {
   role: 'admin' | 'organizer' | 'user';
 }
 
+type RoleFilter = 'all' | UserRow['role']
+
 const AdminUsers = () => {
   const [users, setUsers] = useState<UserRow[]>([]);
   const { safeRequest, api } = useApi();
   const [openCreate, setOpenCreate] = useState(false)
+  const [openCreateUser, setOpenCreateUser] = useState(false)
   const [editing, setEditing] = useState<UserRow | null>(null)
   const [viewing, setViewing] = useState<UserRow | null>(null)
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all')
+  const [search, setSearch] = useState('')
 
   const reload = async () => {
     await safeRequest(async () => {
-      // fetch admins and organizers, normalize into single list
-      const [adminsRes, orgRes] = await Promise.all([api.get('/admin/users'), api.get('/admin/organizers')]);
+      // fetch admins, organizers and regular app users, normalize into single list
+      const [orgRes, regRes] = await Promise.all([
+        api.get('/admin/organizers'),
+        api.get('/admin/registration-users?limit=100'),
+      ]);
 
-      const adminsPayload = (adminsRes as any)?.data ?? adminsRes;
+
       const orgPayload = (orgRes as any)?.data ?? orgRes;
 
-      const admins: UserRow[] = (adminsPayload?.admins || []).map((a: any) => ({
-        _id: a._id || a.id,
-        name: a.name || a.fullName || a.email,
-        email: a.email,
-        phone: a.phone,
-        is_active: typeof a.is_active !== 'undefined' ? a.is_active : true,
-        role: 'admin',
-      }));
+      const regPayload = (regRes as any)?.data ?? regRes;
 
       const orgs: UserRow[] = (orgPayload?.organizers || []).map((o: any) => ({
         _id: o._id,
@@ -51,7 +53,16 @@ const AdminUsers = () => {
         role: 'organizer',
       }));
 
-      setUsers([...admins, ...orgs]);
+      const appUsers: UserRow[] = (regPayload?.registrations || []).map((u: any) => ({
+        _id: u._id,
+        name: u.full_name || u.email,
+        email: u.email,
+        phone: u.phone,
+        is_active: typeof u.is_active !== 'undefined' ? u.is_active : true,
+        role: 'user',
+      }));
+
+      setUsers([...orgs, ...appUsers]);
     })
   }
 
@@ -78,6 +89,15 @@ const AdminUsers = () => {
     });
   };
 
+  const filteredUsers = users.filter((u) => {
+    const matchesRole = roleFilter === 'all' ? true : u.role === roleFilter
+    const term = search.trim().toLowerCase()
+    const matchesSearch = !term
+      ? true
+      : `${u.name} ${u.email} ${u.phone || ''}`.toLowerCase().includes(term)
+    return matchesRole && matchesSearch
+  })
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -89,16 +109,30 @@ const AdminUsers = () => {
               <Input
                 placeholder="Nhập tên, email hoặc SĐT để tìm kiếm"
                 className="pl-10"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <select className="px-4 py-2 border rounded-lg bg-background text-sm">
-              <option>Chọn vai trò để tìm kiếm</option>
-              <option>Admin</option>
-              <option>Tổ chức</option>
-              <option>Người dùng</option>
+            <select
+              className="px-4 py-2 border rounded-lg bg-background text-sm"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
+            >
+              <option value="all">Tất cả vai trò</option>
+              <option value="organizer">Tổ chức</option>
+              <option value="user">Người dùng</option>
             </select>
           </div>
-          <Button className="bg-primary hover:bg-primary/90" onClick={() => setOpenCreate(true)}>TẠO MỚI</Button>
+          <Button
+            className="bg-primary hover:bg-primary/90"
+            onClick={() => {
+              if (roleFilter === 'user') setOpenCreateUser(true)
+              else setOpenCreate(true)
+            }}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+              Tạo ban tổ chức mới
+          </Button> 
         </div>
 
         {/* Table */}
@@ -125,7 +159,7 @@ const AdminUsers = () => {
                 </tr>
               </thead>
               <tbody>
-                {users.map((user, index) => (
+                {filteredUsers.map((user, index) => (
                   <tr
                     key={user._id}
                     className={`border-b hover:bg-muted/50 ${
@@ -151,6 +185,7 @@ const AdminUsers = () => {
                           size="icon"
                           className="text-muted-foreground hover:text-foreground"
                           onClick={() => setEditing(user)}
+                          disabled={user.role === 'user'}
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
@@ -193,6 +228,12 @@ const AdminUsers = () => {
         open={openCreate}
         onOpenChange={(v) => { setOpenCreate(v); if (!v) void reload() }}
         role={'organizer'}
+        onSaved={() => void reload()}
+      />
+
+      <AdminAppUserForm
+        open={openCreateUser}
+        onOpenChange={(v) => { setOpenCreateUser(v); if (!v) void reload() }}
         onSaved={() => void reload()}
       />
 

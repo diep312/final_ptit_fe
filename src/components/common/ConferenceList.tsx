@@ -14,6 +14,7 @@ interface Conference {
   logo: string;
   image: string;
   description: string;
+  tags: string[];
 }
 
 interface GroupedConferences {

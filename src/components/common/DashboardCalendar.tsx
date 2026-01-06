@@ -108,29 +108,46 @@ export const DashboardCalendar = () => {
 
       const dateKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       const eventsForDay = eventsByDate[dateKey] || [];
-      const tooltip = eventsForDay.length > 0 ? eventsForDay.map(ev => `${ev.name} (${ev.timeRange})`).join('\n') : undefined;
+      const showTooltip = eventsForDay.length > 0;
 
       days.push(
         <button
           key={day}
-          title={tooltip}
-          className={`aspect-square flex flex-col items-center justify-center rounded-lg text-sm font-medium transition-colors ${textColor}`}
+          className={`group relative aspect-square flex flex-col items-center justify-center rounded-lg text-sm font-medium transition-colors ${textColor}`}
           style={{ backgroundColor: bgColor }}
         >
           <div>{day}</div>
           <div className="flex gap-1 mt-1">
-            {eventsForDay.slice(0, 3).map((ev, idx) => (
+            {eventsForDay.slice(0, 2).map((ev, idx) => (
               <span
                 key={idx}
                 className="w-2 h-2 rounded-full"
                 style={{ backgroundColor: ev.color }}
-                title={`${ev.name} (${ev.timeRange})`}
               />
             ))}
-            {eventsForDay.length > 3 && (
-              <span className="text-xs text-muted-foreground">+{eventsForDay.length - 3}</span>
+            {eventsForDay.length > 2 && (
+              <span className="text-xs text-muted-foreground">+{eventsForDay.length - 2}</span>
             )}
           </div>
+
+          {showTooltip && (
+            <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 w-max -translate-x-1/2 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="max-w-xs whitespace-pre-line rounded-md bg-white p-3 text-sm text-black shadow-lg">
+                <div className="font-medium text-md mb-1">Sự kiện</div>
+                <div className="space-y-1">
+                  {eventsForDay.slice(0, 6).map((ev) => (
+                    <div key={ev.id} className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: ev.color }} />
+                      <span className="leading-snug text-sm text-muted-foreground">{ev.name}</span>
+                    </div>
+                  ))}
+                  {eventsForDay.length > 6 && (
+                    <div className="text-sm text-muted-foreground">+{eventsForDay.length - 6} sự kiện khác</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </button>
       );
     }
