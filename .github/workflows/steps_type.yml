@@ -1,0 +1,24 @@
+name: demo_step_types
+
+on:
+  workflow_dispatch:
+
+
+jobs: 
+  say-hello-bash:
+      runs-on: ubuntu-latest
+      steps:
+        - run: echo "Hello world!" 
+
+  say-hello-python: 
+      runs-on: ubuntu-latest
+      steps:
+        - run: print("Hello world!")
+          shell: python 
+
+  say-hello-javascript:
+      runs-on: unbuntu-latest
+      steps:
+        - uses: actions/hello-world-javascript-action@main
+          with:
+            who-to-greet: "World"
