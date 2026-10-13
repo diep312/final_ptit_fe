@@ -1,0 +1,29 @@
+name: trigger_events_demo
+
+on: 
+  push: 
+    branches:
+      - "main"
+      - "feat/*"
+
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+    paths:
+      - "src/pages/*.tsx"
+  
+  schedule: 
+    - cron "0 0 * * *" # Midnight
+
+  workflow-dispatch:
+
+
+jobs:
+  event-triggered:
+    runs-on: ubuntu-latest
+    steps:
+      - name: See event run
+        run: echo "=== $GITHUB_EVENT_NAME payload ===" 
