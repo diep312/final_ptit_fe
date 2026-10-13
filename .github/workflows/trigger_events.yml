@@ -16,7 +16,7 @@ on:
       - "src/pages/*.tsx"
   
   schedule: 
-    - cron "0 0 * * *" # Midnight
+    - cron: "0 0 * * *" # Midnight
 
   workflow-dispatch:
 
