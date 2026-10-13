@@ -26,4 +26,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: See event run
-        run: echo "=== $GITHUB_EVENT_NAME payload ===" 
+        run: |
+          echo "=== $GITHUB_EVENT_NAME payload ==="
+          jq . "$GITHUB_EVENT_PATH"

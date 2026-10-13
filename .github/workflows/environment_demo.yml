@@ -3,37 +3,34 @@ on:
   workflow_dispatch:
 
 
-env: 
-  WORKFLOW_ENV: THIS_IS_WORKFLOW_ENV
+env:
+  WORKFLOW_VAR: THIS_IS_WORKFLOW_ENV
 
 jobs:
   job-1:
     runs-on: ubuntu-latest
-    env: 
+    env:
       JOB_VAR: JOB_1_ENV
     steps:
       - name: environment scope of step 1
-        env: 
+        env:
           STEP_VAR: STEP_OF_JOB_1_VAR
-        run: 
+        run: |
           echo "WORKFLOW_VAR: $WORKFLOW_VAR"
           echo "JOB_VAR: $JOB_VAR"
           echo "STEP_VAR: $STEP_VAR"
 
       - name: environment scope of step 2
-        run: 
+        run: |
           echo "WORKFLOW_VAR: $WORKFLOW_VAR"
           echo "JOB_VAR: $JOB_VAR"
-          echo "STEP_VAR: ${STEP_VAR:<UNSET>}"
+          echo "STEP_VAR: ${STEP_VAR:-<UNSET>}"
 
   job-2:
     runs-on: ubuntu-latest
     steps:
       - name: environment scope of job 2
-        run: 
+        run: |
           echo "WORKFLOW_VAR: $WORKFLOW_VAR"
-          echo "JOB_VAR: ${JOB_VAR:<UNSET>}
-          echo "STEP_VAR: ${STEP_VAR:<UNSET>}
-
-
-
+          echo "JOB_VAR: ${JOB_VAR:-<UNSET>}"
+          echo "STEP_VAR: ${STEP_VAR:-<UNSET>}"
