@@ -1,0 +1,26 @@
+name: output_demo
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  producer:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - id: meta
+        run: |
+          TAG="sha-${GITHUB_SHA::7}"
+          echo "tag=$TAG"       >> "$GITHUB_OUTPUT"
+          echo "IMAGE_TAG=$TAG" >> "$GITHUB_ENV"
+      - run: echo "Output: ${{ steps.meta.outputs.tag }}"
+      - run: echo "Env: $IMAGE_TAG | ${{ env.IMAGE_TAG }}"
+  
+  consumer:
+    needs: producer
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Producer output: ${{ needs.producer.outputs.tag }}"
+      - run: echo "Environment set ${IMAGE_TAG:-<UNSET>}"  
+
