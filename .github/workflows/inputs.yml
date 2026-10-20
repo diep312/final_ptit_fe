@@ -42,8 +42,3 @@ jobs:
       - name: Use environment config
         run: echo "Target ${{ inputs.target }} → API ${{ vars.API_URL }}"
 
-      - uses: actions/checkout@v5
-      - name: Pass input into the composite action
-        uses: ./actions/composite-hello
-        with:
-          who-to-greet: ${{ inputs.name }}
