@@ -38,7 +38,8 @@ jobs:
           path: node_modules
           key: modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - run: echo "Cache hit: ${{ steps.cache.outputs.cache-hit || 'false' }}"
+      - run: |
+          echo "Cache hit: ${{ steps.cache.outputs.cache-hit || 'false' }}"
 
       - if: steps.cache.outputs.cache-hit != 'true'
         run: npm ci
