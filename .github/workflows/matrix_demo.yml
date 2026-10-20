@@ -1,0 +1,41 @@
+name: Matrix demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      break:
+        description: Make Windows + vi fail on purpose?
+        type: boolean
+        default: false
+
+jobs:
+  hello:
+    name: ${{ matrix.os }} / ${{ matrix.lang }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        lang: [en, vi]
+        include:
+          - lang: en
+            greeting: Hello
+          - lang: vi
+            greeting: Xin chao
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Greet
+        shell: bash
+        run: |
+          echo "${{ matrix.greeting }} from ${{ runner.os }}"
+          echo "Combination: os=${{ matrix.os }}, lang=${{ matrix.lang }}"
+
+      - name: Fail on purpose
+        if: inputs.break && matrix.os == 'windows-latest' && matrix.lang == 'vi'
+        shell: bash
+        run: |
+          echo "::error::Simulated failure on Windows + vi"
+          exit 1
+
+      - name: Simulate tests
+        shell: bash
+        run: sleep 15
