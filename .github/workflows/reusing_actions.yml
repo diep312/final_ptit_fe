@@ -1,0 +1,36 @@
+name: Reusing action demo
+
+on:
+  workflow_dispatch:
+
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5            # required: local actions live in the repo
+
+      - id: hello-lab
+        name: Greet the lab
+        uses: ./actions/composite-hello
+        with:
+          who-to-greet: YIRLoDT
+
+      - id: hello-default
+        name: Greet with default input
+        uses: ./actions/composite-hello
+
+      - name: Read outputs from the action
+        run: |
+          echo "Lab greeted at     ${{ steps.hello-lab.outputs.time }}"
+          echo "Default greeted at ${{ steps.hello-default.outputs.time }}"
+
+  greet-matrix:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./actions/composite-hello
+        with:
+          who-to-greet: ${{ matrix.os }}

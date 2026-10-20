@@ -1,0 +1,27 @@
+name: Composite Hello
+description: Greet someone and return the time of the greeting
+
+inputs:
+  who-to-greet:
+    description: Name to greet
+    required: false
+    default: World
+
+outputs:
+  time:
+    description: Time the greeting was made
+    value: ${{ steps.greet.outputs.time }}
+
+runs:
+  using: composite
+  steps:
+    - id: greet
+      shell: bash
+      env:
+        NAME: ${{ inputs.who-to-greet }}
+      run: |
+        echo "Hello $NAME!"
+        echo "time=$(date -u +%H:%M:%S)" >> "$GITHUB_OUTPUT"
+
+    - shell: bash
+      run: echo "Running on ${{ runner.os }}, triggered by ${{ github.actor }}"

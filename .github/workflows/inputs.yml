@@ -1,0 +1,49 @@
+name: Manual input demo
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: Who to greet
+        type: string
+        required: true
+        default: YIRLoDT
+      greeting:
+        description: Greeting word
+        type: choice
+        options: [Hello, Hi, Hey]
+        default: Hello
+      shout:
+        description: Print in uppercase?
+        type: boolean
+        default: false
+      target:
+        description: Environment to use
+        type: environment
+        required: true
+
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target }}
+    steps:
+      - name: Greet
+        env:
+          NAME: ${{ inputs.name }}
+          GREETING: ${{ inputs.greeting }}
+        run: |
+          MSG="$GREETING, $NAME!"
+          if [ "${{ inputs.shout }}" = "true" ]; then MSG="${MSG^^}"; fi
+          echo "$MSG"
+
+      - name: Only runs when shout is checked
+        if: inputs.shout
+        run: echo "Shout mode is on"
+
+      - name: Use environment config
+        run: echo "Target ${{ inputs.target }} → API ${{ vars.API_URL }}"
+
+      - uses: actions/checkout@v5
+      - name: Pass input into the composite action
+        uses: ./actions/composite-hello
+        with:
+          who-to-greet: ${{ inputs.name }}
